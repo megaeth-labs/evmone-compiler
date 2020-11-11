@@ -11,10 +11,6 @@
 
 namespace evmone
 {
-namespace
-{
-using JumpdestMap = std::vector<bool>;
-
 JumpdestMap build_jumpdest_map(const uint8_t* code, size_t code_size)
 {
     JumpdestMap m(code_size);
@@ -29,6 +25,8 @@ JumpdestMap build_jumpdest_map(const uint8_t* code, size_t code_size)
     return m;
 }
 
+namespace
+{
 const uint8_t* op_jump(ExecutionState& state, const JumpdestMap& jumpdest_map) noexcept
 {
     const auto dst = state.stack.pop();

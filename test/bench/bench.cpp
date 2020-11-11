@@ -1,11 +1,12 @@
 // evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2019 The evmone Authors.
+// Copyright 2019-2020 The evmone Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 #include <benchmark/benchmark.h>
 #include <evmc/evmc.hpp>
 #include <evmc/loader.h>
 #include <evmone/analysis.hpp>
+#include <evmone/baseline.hpp>
 #include <evmone/evmone.h>
 #include <test/utils/utils.hpp>
 
@@ -68,6 +69,19 @@ void analyse(State& state, bytes_view code) noexcept
     state.counters["rate"] = Counter(static_cast<double>(bytes_analysed), Counter::kIsRate);
 }
 
+void build_jumpdest_map(State& state, bytes_view code) noexcept
+{
+    auto bytes_analysed = uint64_t{0};
+    for (auto _ : state)
+    {
+        auto r = evmone::build_jumpdest_map(code.data(), code.size());
+        DoNotOptimize(r);
+        bytes_analysed += code.size();
+    }
+    state.counters["size"] = Counter(static_cast<double>(code.size()));
+    state.counters["rate"] = Counter(static_cast<double>(bytes_analysed), Counter::kIsRate);
+}
+
 struct benchmark_case
 {
     std::shared_ptr<bytes> code;
@@ -116,6 +130,10 @@ void load_benchmark(const fs::path& path, const std::string& name_prefix)
 
     RegisterBenchmark((base_name + "/analysis").c_str(), [code](State& state) {
         analyse(state, *code);
+    })->Unit(kMicrosecond);
+
+    RegisterBenchmark((base_name + "/build_jumpdest_map").c_str(), [code](State& state) {
+        build_jumpdest_map(state, *code);
     })->Unit(kMicrosecond);
 
     enum class state
