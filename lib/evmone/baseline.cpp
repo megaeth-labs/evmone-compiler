@@ -18,7 +18,7 @@ JumpdestMap build_jumpdest_map(const uint8_t* code, size_t code_size)
     {
         const auto op = code[i];
         if (op == OP_JUMPDEST)
-            m[i] = true;
+            m.set(i);
         else if (op >= OP_PUSH1 && op <= OP_PUSH32)
             i += static_cast<size_t>(op - OP_PUSH1 + 1);
     }
