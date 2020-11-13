@@ -16,6 +16,7 @@ add_executable(evmone-unittests
     evm_state_test.cpp
     evm_other_test.cpp
     evmone_test.cpp
+    jumpdest_analysis_test.cpp
     op_table_test.cpp
     opcode_manip_test.cpp
     utils_test.cpp
