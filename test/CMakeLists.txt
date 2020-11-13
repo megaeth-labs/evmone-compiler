@@ -10,6 +10,7 @@ set(evmone_private_include_dir ${PROJECT_SOURCE_DIR}/lib)
 hunter_add_package(benchmark)
 find_package(benchmark CONFIG REQUIRED)
 
+add_subdirectory(experimental)
 add_subdirectory(utils)
 add_subdirectory(bench)
 add_subdirectory(internal_benchmarks)
