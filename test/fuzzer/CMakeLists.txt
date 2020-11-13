@@ -14,8 +14,14 @@ else()
     string(REPLACE fuzzer-no-link fuzzer CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS})
 endif()
 
+hunter_add_package(intx)
+find_package(intx CONFIG REQUIRED)
+
 add_executable(evmone-fuzzer fuzzer.cpp)
 target_link_libraries(evmone-fuzzer PRIVATE evmone testutils evmc::mocked_host)
+
+add_executable(jumpdest-fuzzer jumpdest_analysis_fuzz.cpp)
+target_link_libraries(jumpdest-fuzzer PRIVATE evmone evmone::experimental intx::intx)
 
 if(NOT fuzzing_coverage)
     # TODO: Aleth reports undefined behaviors, disable it for fuzzing.

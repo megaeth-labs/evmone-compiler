@@ -20,7 +20,7 @@ set(targets evmone-bench evmone-bench-internal evmone-unittests testutils)
 
 if(EVMONE_FUZZING)
     add_subdirectory(fuzzer)
-    list(APPEND targets evmone-fuzzer)
+    list(APPEND targets evmone-fuzzer jumpdest-fuzzer)
 endif()
 
 set_target_properties(
