@@ -19,8 +19,7 @@ class bitset
     std::size_t size_;
 
 public:
-    explicit bitset(std::size_t size)
-      : words_{new word_type[(size + (bpw - 1)) / bpw]}, size_{size}
+    explicit bitset(std::size_t size) : words_{new word_type[(size + (bpw - 1)) / bpw]}, size_{size}
     {
         std::memset(words_.get(), 0, (size + (bpw - 1)) / bpw);
     }
@@ -35,6 +34,14 @@ public:
         words_[w] |= bitmask;
     }
 
+    void unset(std::size_t index) noexcept
+    {
+        const auto w = index / bpw;
+        const auto x = index % bpw;
+        const auto bitmask = word_type(~(word_type{1} << x));
+        words_[w] &= bitmask;
+    }
+
     bool operator[](std::size_t index) const noexcept
     {
         const auto w = index / bpw;
@@ -42,6 +49,8 @@ public:
         const auto bitmask = word_type{1} << x;
         return (words_[w] & bitmask) != 0;
     }
+
+    void set_size(std::size_t size) noexcept { size_ = size; }
 };
 
 using JumpdestMap = bitset;
