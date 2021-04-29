@@ -13,41 +13,44 @@ namespace evmone
 {
 class bitset
 {
-    static constexpr auto bpw = 8;
     using word_type = uint8_t;
+    static constexpr auto word_bit = 8 * sizeof(word_type);
     std::unique_ptr<word_type[]> words_;
     std::size_t size_;
 
-public:
-    explicit bitset(std::size_t size) : words_{new word_type[(size + (bpw - 1)) / bpw]}, size_{size}
+    static constexpr std::size_t get_num_words_required(std::size_t size) noexcept
     {
-        std::memset(words_.get(), 0, (size + (bpw - 1)) / bpw);
+        return (size + (word_bit - 1)) / word_bit;
+    }
+
+public:
+    explicit bitset(std::size_t size)
+      : words_{new word_type[get_num_words_required(size)]}, size_{size}
+    {
+        std::memset(words_.get(), 0, get_num_words_required(size) * sizeof(word_type));
     }
 
     std::size_t size() const noexcept { return size_; }
 
     void set(std::size_t index) noexcept
     {
-        const auto w = index / bpw;
-        const auto x = index % bpw;
-        const auto bitmask = word_type(word_type{1} << x);
-        words_[w] |= bitmask;
+        auto& word = words_[index / word_bit];
+        const auto bitmask = word_type{1} << (index % word_bit);
+        word |= bitmask;
     }
 
     void unset(std::size_t index) noexcept
     {
-        const auto w = index / bpw;
-        const auto x = index % bpw;
-        const auto bitmask = word_type(~(word_type{1} << x));
-        words_[w] &= bitmask;
+        auto& word = words_[index / word_bit];
+        const auto bitmask = word_type{1} << (index % word_bit);
+        word &= ~bitmask;
     }
 
     bool operator[](std::size_t index) const noexcept
     {
-        const auto w = index / bpw;
-        const auto x = index % bpw;
-        const auto bitmask = word_type{1} << x;
-        return (words_[w] & bitmask) != 0;
+        const auto& word = words_[index / word_bit];
+        const auto bitmask = word_type{1} << (index % word_bit);
+        return (word & bitmask) != 0;
     }
 
     void set_size(std::size_t size) noexcept { size_ = size; }
