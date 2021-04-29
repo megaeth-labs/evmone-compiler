@@ -13,7 +13,7 @@ namespace evmone
 {
 class bitset
 {
-    using word_type = uint8_t;
+    using word_type = uint32_t;
     static constexpr auto word_bit = 8 * sizeof(word_type);
     std::unique_ptr<word_type[]> words_;
     std::size_t size_;
