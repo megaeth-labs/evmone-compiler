@@ -17,10 +17,10 @@ JumpdestMap build_jumpdest_map(const uint8_t* code, size_t code_size)
     for (size_t i = 0; i < code_size; ++i)
     {
         const auto op = code[i];
-        if (__builtin_expect(op == OP_JUMPDEST, false))
-            m.set(i);
-        else if (op >= OP_PUSH1 && op <= OP_PUSH32)
+        if (static_cast<int8_t>(op) >= static_cast<int8_t>(OP_PUSH1))
             i += static_cast<size_t>(op - OP_PUSH1 + 1);
+        else if (__builtin_expect(op == OP_JUMPDEST, false))
+            m.set(i);
     }
     return m;
 }
