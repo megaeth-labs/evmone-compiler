@@ -21,11 +21,16 @@ struct StorageValue
 
     /// The original value.
     bytes32 original{};
+
+    evmc_access_status access_status = EVMC_ACCESS_COLD;
 };
 
 /// The state account.
 struct Account
 {
+    /// The maximum allowed nonce value.
+    static constexpr auto NonceMax = std::numeric_limits<uint64_t>::max();
+
     /// The account nonce.
     uint64_t nonce = 0;
 
@@ -37,5 +42,15 @@ struct Account
 
     /// The account code.
     bytes code;
+
+    /// Is the account "touched" as defined in EIP-161.
+    bool touched = false;
+
+    evmc_access_status access_status = EVMC_ACCESS_COLD;
+
+    [[nodiscard]] bool is_empty() const noexcept
+    {
+        return code.empty() && nonce == 0 && balance == 0;
+    }
 };
 }  // namespace evmone::state
