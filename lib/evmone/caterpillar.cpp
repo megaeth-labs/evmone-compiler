@@ -126,10 +126,19 @@ constexpr InstrTable build_instr_table() noexcept
 #undef X_UNDEFINED
 }
 
-constexpr auto instr_table = build_instr_table<EVMC_FRONTIER>();
-
-static_assert(std::size(instr_table) == 256);
-static_assert(instr_table[OP_PUSH2] == invoke<OP_PUSH2>);
+constexpr InstrTable instr_table[] = {
+    build_instr_table<EVMC_FRONTIER>(),
+    build_instr_table<EVMC_HOMESTEAD>(),
+    build_instr_table<EVMC_TANGERINE_WHISTLE>(),
+    build_instr_table<EVMC_SPURIOUS_DRAGON>(),
+    build_instr_table<EVMC_BYZANTIUM>(),
+    build_instr_table<EVMC_CONSTANTINOPLE>(),
+    build_instr_table<EVMC_PETERSBURG>(),
+    build_instr_table<EVMC_ISTANBUL>(),
+    build_instr_table<EVMC_BERLIN>(),
+    build_instr_table<EVMC_LONDON>(),
+    build_instr_table<EVMC_SHANGHAI>(),
+};
 
 /// A helper to invoke the instruction implementation of the given opcode Op.
 template <evmc_opcode Op>
@@ -171,10 +180,11 @@ evmc_result execute(
     // Use padded code.
     state.code = {analysis.padded_code.get(), state.code.size()};
 
-    state.tbl = instr_table.data();
+    const auto& tbl = instr_table[state.rev];
+    state.tbl = tbl.data();
 
     const auto code_it = state.code.data();
-    const auto first_fn = instr_table[*code_it];
+    const auto first_fn = tbl[*code_it];
     state.stack_bottom = state.stack.top_item;
     auto stack_top = state.stack.top_item;
     const auto status = first_fn(stack_top, code_it, state.gas_left, state);
