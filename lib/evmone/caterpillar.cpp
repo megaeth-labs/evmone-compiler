@@ -152,17 +152,16 @@ evmc_status_code invoke(
 
     const auto stack_size = stack_top - state.stack_bottom;
     if (INTX_UNLIKELY(!check_stack<Op>(stack_size)))
-        return stack_size < Stack::limit ? EVMC_STACK_UNDERFLOW : EVMC_STACK_OVERFLOW;
+        return EVMC_FAILURE;
 
     if (gas = check_gas<Op>(gas, state.rev); INTX_UNLIKELY(gas < 0))
-        return EVMC_OUT_OF_GAS;
+        return EVMC_FAILURE;
 
     state.gas_left = gas;
     code_it = invoke(instr::core::impl<Op>, stack_top, code_it, gas, state);
     gas = state.gas_left;
     if (!code_it)
         return state.status;
-
 
     stack_top += instr::traits[Op].stack_height_change;
     const auto tbl = static_cast<const InstrFn*>(state.tbl);
