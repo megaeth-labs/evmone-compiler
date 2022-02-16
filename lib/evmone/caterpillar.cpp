@@ -62,21 +62,6 @@ namespace
 /// @}
 
 template <evmc_opcode Op>
-inline evmc_status_code check_defined(evmc_revision rev) noexcept
-{
-    static_assert(
-        !(instr::has_const_gas_cost(Op) && instr::gas_costs[EVMC_FRONTIER][Op] == instr::undefined),
-        "undefined instructions must not be handled by check_requirements()");
-
-    if constexpr (!instr::has_const_gas_cost(Op))
-    {
-        if (INTX_UNLIKELY(instr::gas_costs[rev][Op] < 0))
-            return EVMC_UNDEFINED_INSTRUCTION;
-    }
-    return EVMC_SUCCESS;
-}
-
-template <evmc_opcode Op>
 inline bool check_stack(ptrdiff_t stack_size) noexcept
 {
     if constexpr (instr::traits[Op].stack_height_change > 0)
@@ -119,7 +104,7 @@ using InstrTable = std::array<InstrFn, 256>;
 template <evmc_revision Rev>
 constexpr InstrTable build_instr_table() noexcept
 {
-#define X(OPCODE, IDENTIFIER) invoke<OPCODE>,
+#define X(OPCODE, IDENTIFIER) (instr::traits[OPCODE].since <= Rev ? invoke<OPCODE> : cat_undefined),
 #define X_UNDEFINED(OPCODE) cat_undefined,
     return {MAP_OPCODE_TO_IDENTIFIER};
 #undef X
@@ -146,10 +131,6 @@ evmc_status_code invoke(
     uint256* stack_top, code_iterator code_it, int64_t gas, ExecutionState& state) noexcept
 {
     [[maybe_unused]] auto op = Op;
-
-    const auto rev = state.rev;
-    if (const auto status = check_defined<Op>(rev); status != EVMC_SUCCESS)
-        return status;
 
     const auto stack_size = stack_top - state.stack_bottom;
     if (INTX_UNLIKELY(!check_stack<Op>(stack_size)))
