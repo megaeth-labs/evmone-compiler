@@ -77,11 +77,8 @@ inline evmc_status_code check_defined(evmc_revision rev) noexcept
 }
 
 template <evmc_opcode Op>
-inline evmc_status_code check_requirements(
-    int64_t& gas_left, ptrdiff_t stack_size, evmc_revision rev) noexcept
+inline evmc_status_code check_stack(ptrdiff_t stack_size) noexcept
 {
-    // Check stack requirements first. This is order is not required,
-    // but it is nicer because complete gas check may need to inspect operands.
     if constexpr (instr::traits[Op].stack_height_change > 0)
     {
         static_assert(instr::traits[Op].stack_height_change == 1);
@@ -93,7 +90,12 @@ inline evmc_status_code check_requirements(
         if (INTX_UNLIKELY(stack_size < instr::traits[Op].stack_height_required))
             return EVMC_STACK_UNDERFLOW;
     }
+    return EVMC_SUCCESS;
+}
 
+template <evmc_opcode Op>
+inline evmc_status_code check_gas(int64_t& gas_left, evmc_revision rev) noexcept
+{
     auto gas_cost = instr::gas_costs[EVMC_FRONTIER][Op];  // Init assuming const cost.
     if constexpr (!instr::has_const_gas_cost(Op))
         gas_cost = instr::gas_costs[rev][Op];  // If not, load the cost from the table.
@@ -139,8 +141,11 @@ evmc_status_code invoke(const uint256* stack_bottom, uint256* stack_top, code_it
         return status;
 
     const auto stack_size = stack_top - stack_bottom;
-    if (const auto status = check_requirements<Op>(state.gas_left, stack_size, state.rev);
-        status != EVMC_SUCCESS)
+    if (const auto status = check_stack<Op>(stack_size); INTX_UNLIKELY(status != EVMC_SUCCESS))
+        return status;
+
+    if (const auto status = check_gas<Op>(state.gas_left, state.rev);
+        INTX_UNLIKELY(status != EVMC_SUCCESS))
         return status;
 
     code_it = invoke(instr::core::impl<Op>, stack_top, code_it, state);
