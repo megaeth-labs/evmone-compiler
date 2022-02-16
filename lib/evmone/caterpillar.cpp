@@ -14,14 +14,14 @@ namespace evmone::caterpillar
 namespace
 {
 [[gnu::always_inline]] inline code_iterator invoke(void (*instr_fn)(StackTop), uint256* stack_top,
-    code_iterator code_it, ExecutionState& /*state*/) noexcept
+    code_iterator code_it, int64_t /*gas*/, ExecutionState& /*state*/) noexcept
 {
     instr_fn(stack_top);
     return code_it + 1;
 }
 
 [[gnu::always_inline]] inline code_iterator invoke(StopToken (*instr_fn)(), uint256* /*stack_top*/,
-    code_iterator /*code_it*/, ExecutionState& state) noexcept
+    code_iterator /*code_it*/, int64_t /*gas*/, ExecutionState& state) noexcept
 {
     state.status = instr_fn().status;
     return nullptr;
@@ -29,7 +29,7 @@ namespace
 
 [[gnu::always_inline]] inline code_iterator invoke(
     evmc_status_code (*instr_fn)(StackTop, ExecutionState&), uint256* stack_top,
-    code_iterator code_it, ExecutionState& state) noexcept
+    code_iterator code_it, int64_t /*gas*/, ExecutionState& state) noexcept
 {
     if (const auto status = instr_fn(stack_top, state); status != EVMC_SUCCESS)
     {
@@ -40,7 +40,7 @@ namespace
 }
 
 [[gnu::always_inline]] inline code_iterator invoke(void (*instr_fn)(StackTop, ExecutionState&),
-    uint256* stack_top, code_iterator code_it, ExecutionState& state) noexcept
+    uint256* stack_top, code_iterator code_it, int64_t /*gas*/, ExecutionState& state) noexcept
 {
     instr_fn(stack_top, state);
     return code_it + 1;
@@ -48,13 +48,13 @@ namespace
 
 [[gnu::always_inline]] inline code_iterator invoke(
     code_iterator (*instr_fn)(StackTop, ExecutionState&, code_iterator), uint256* stack_top,
-    code_iterator code_it, ExecutionState& state) noexcept
+    code_iterator code_it, int64_t /*gas*/, ExecutionState& state) noexcept
 {
     return instr_fn(stack_top, state, code_it);
 }
 
 [[gnu::always_inline]] inline code_iterator invoke(StopToken (*instr_fn)(StackTop, ExecutionState&),
-    uint256* stack_top, code_iterator /*code_it*/, ExecutionState& state) noexcept
+    uint256* stack_top, code_iterator /*code_it*/, int64_t /*gas*/, ExecutionState& state) noexcept
 {
     state.status = instr_fn(stack_top, state).status;
     return nullptr;
@@ -104,16 +104,16 @@ inline int64_t check_gas(int64_t gas_left, evmc_revision rev) noexcept
 
 template <evmc_opcode Op>
 evmc_status_code invoke(const uint256* stack_bottom, uint256* stack_top, code_iterator code_it,
-    void*, ExecutionState& state) noexcept;
+    void*, int64_t /*gas*/, ExecutionState& state) noexcept;
 
 evmc_status_code cat_undefined(const uint256* /*stack_bottom*/, uint256* /*stack_top*/,
-    code_iterator /*code_it*/, void*, ExecutionState& /*state*/) noexcept
+    code_iterator /*code_it*/, void*, int64_t /*gas*/, ExecutionState& /*state*/) noexcept
 {
     return EVMC_UNDEFINED_INSTRUCTION;
 }
 
 using InstrFn = evmc_status_code (*)(const uint256* stack_bottom, uint256* stack_top,
-    code_iterator code_it, void*, ExecutionState& state) noexcept;
+    code_iterator code_it, void*, int64_t, ExecutionState& state) noexcept;
 
 constexpr auto instr_table = []() noexcept {
 #define X(OPCODE, IDENTIFIER) invoke<OPCODE>,
@@ -129,7 +129,7 @@ static_assert(instr_table[OP_PUSH2] == invoke<OP_PUSH2>);
 /// A helper to invoke the instruction implementation of the given opcode Op.
 template <evmc_opcode Op>
 evmc_status_code invoke(const uint256* stack_bottom, uint256* stack_top, code_iterator code_it,
-    void* tbl, ExecutionState& state) noexcept
+    void* tbl, int64_t gas, ExecutionState& state) noexcept
 {
     [[maybe_unused]] auto op = Op;
 
@@ -141,17 +141,19 @@ evmc_status_code invoke(const uint256* stack_bottom, uint256* stack_top, code_it
     if (INTX_UNLIKELY(!check_stack<Op>(stack_size)))
         return stack_size < Stack::limit ? EVMC_STACK_UNDERFLOW : EVMC_STACK_OVERFLOW;
 
-    if (state.gas_left = check_gas<Op>(state.gas_left, state.rev);
-        INTX_UNLIKELY(state.gas_left < 0))
+    if (gas = check_gas<Op>(gas, state.rev); INTX_UNLIKELY(gas < 0))
         return EVMC_OUT_OF_GAS;
 
-    code_it = invoke(instr::core::impl<Op>, stack_top, code_it, state);
+    state.gas_left = gas;
+    code_it = invoke(instr::core::impl<Op>, stack_top, code_it, gas, state);
+    gas = state.gas_left;
     if (!code_it)
         return state.status;
 
+
     stack_top += instr::traits[Op].stack_height_change;
     auto tbl2 = (InstrFn*)tbl;
-    [[clang::musttail]] return tbl2[*code_it](stack_bottom, stack_top, code_it, tbl, state);
+    [[clang::musttail]] return tbl2[*code_it](stack_bottom, stack_top, code_it, tbl, gas, state);
 }
 
 }  // namespace
@@ -168,8 +170,8 @@ evmc_result execute(
     const auto first_fn = instr_table[*code_it];
     const auto stack_bottom = state.stack.top_item;
     auto stack_top = stack_bottom;
-    const auto status =
-        first_fn(stack_bottom, stack_top, code_it, (void*)instr_table.data(), state);
+    const auto status = first_fn(
+        stack_bottom, stack_top, code_it, (void*)instr_table.data(), state.gas_left, state);
 
     const auto gas_left = (status == EVMC_SUCCESS || status == EVMC_REVERT) ? state.gas_left : 0;
     const auto result = evmc::make_result(status, gas_left,
