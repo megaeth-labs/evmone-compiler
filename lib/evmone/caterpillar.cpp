@@ -115,14 +115,19 @@ evmc_status_code cat_undefined(uint256* /*stack_top*/, code_iterator /*code_it*/
 using InstrFn = evmc_status_code (*)(
     uint256* stack_top, code_iterator code_it, int64_t, ExecutionState& state) noexcept;
 
-constexpr auto instr_table = []() noexcept {
+using InstrTable = std::array<InstrFn, 256>;
+template <evmc_revision Rev>
+constexpr InstrTable build_instr_table() noexcept
+{
 #define X(OPCODE, IDENTIFIER) invoke<OPCODE>,
 #define X_UNDEFINED(OPCODE) cat_undefined,
-    std::array<InstrFn, 256> table{MAP_OPCODE_TO_IDENTIFIER};
-    return table;
+    return {MAP_OPCODE_TO_IDENTIFIER};
 #undef X
 #undef X_UNDEFINED
-}();
+}
+
+constexpr auto instr_table = build_instr_table<EVMC_FRONTIER>();
+
 static_assert(std::size(instr_table) == 256);
 static_assert(instr_table[OP_PUSH2] == invoke<OP_PUSH2>);
 
