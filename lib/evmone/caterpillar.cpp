@@ -134,10 +134,8 @@ evmc_status_code invoke(const uint256* stack_bottom, uint256* stack_top, code_it
     const auto stack_size = stack_top - stack_bottom;
     if (const auto status = check_requirements<Op>(state.gas_left, stack_size, state.rev);
         status != EVMC_SUCCESS)
-    {
-        state.status = status;
         return status;
-    }
+
     code_it = invoke(instr::core::impl<Op>, stack_top, code_it, state);
     if (!code_it)
         return state.status;
