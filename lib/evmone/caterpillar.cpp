@@ -103,17 +103,17 @@ inline int64_t check_gas(int64_t gas_left, evmc_revision rev) noexcept
 }
 
 template <evmc_opcode Op>
-evmc_status_code invoke(uint256* stack_top, code_iterator code_it, void*, int64_t /*gas*/,
-    ExecutionState& state) noexcept;
+evmc_status_code invoke(
+    uint256* stack_top, code_iterator code_it, int64_t /*gas*/, ExecutionState& state) noexcept;
 
-evmc_status_code cat_undefined(uint256* /*stack_top*/, code_iterator /*code_it*/, void*,
-    int64_t /*gas*/, ExecutionState& /*state*/) noexcept
+evmc_status_code cat_undefined(uint256* /*stack_top*/, code_iterator /*code_it*/, int64_t /*gas*/,
+    ExecutionState& /*state*/) noexcept
 {
     return EVMC_UNDEFINED_INSTRUCTION;
 }
 
 using InstrFn = evmc_status_code (*)(
-    uint256* stack_top, code_iterator code_it, void*, int64_t, ExecutionState& state) noexcept;
+    uint256* stack_top, code_iterator code_it, int64_t, ExecutionState& state) noexcept;
 
 constexpr auto instr_table = []() noexcept {
 #define X(OPCODE, IDENTIFIER) invoke<OPCODE>,
@@ -128,8 +128,8 @@ static_assert(instr_table[OP_PUSH2] == invoke<OP_PUSH2>);
 
 /// A helper to invoke the instruction implementation of the given opcode Op.
 template <evmc_opcode Op>
-evmc_status_code invoke(uint256* stack_top, code_iterator code_it, void* tbl, int64_t gas,
-    ExecutionState& state) noexcept
+evmc_status_code invoke(
+    uint256* stack_top, code_iterator code_it, int64_t gas, ExecutionState& state) noexcept
 {
     [[maybe_unused]] auto op = Op;
 
@@ -152,8 +152,8 @@ evmc_status_code invoke(uint256* stack_top, code_iterator code_it, void* tbl, in
 
 
     stack_top += instr::traits[Op].stack_height_change;
-    auto tbl2 = (InstrFn*)tbl;
-    [[clang::musttail]] return tbl2[*code_it](stack_top, code_it, tbl, gas, state);
+    const auto tbl = static_cast<const InstrFn*>(state.tbl);
+    [[clang::musttail]] return tbl[*code_it](stack_top, code_it, gas, state);
 }
 
 }  // namespace
@@ -166,12 +166,13 @@ evmc_result execute(
     // Use padded code.
     state.code = {analysis.padded_code.get(), state.code.size()};
 
+    state.tbl = instr_table.data();
+
     const auto code_it = state.code.data();
     const auto first_fn = instr_table[*code_it];
     state.stack_bottom = state.stack.top_item;
     auto stack_top = state.stack.top_item;
-    const auto status =
-        first_fn(stack_top, code_it, (void*)instr_table.data(), state.gas_left, state);
+    const auto status = first_fn(stack_top, code_it, state.gas_left, state);
 
     const auto gas_left = (status == EVMC_SUCCESS || status == EVMC_REVERT) ? state.gas_left : 0;
     const auto result = evmc::make_result(status, gas_left,
