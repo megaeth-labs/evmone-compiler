@@ -77,20 +77,20 @@ inline evmc_status_code check_defined(evmc_revision rev) noexcept
 }
 
 template <evmc_opcode Op>
-inline evmc_status_code check_stack(ptrdiff_t stack_size) noexcept
+inline bool check_stack(ptrdiff_t stack_size) noexcept
 {
     if constexpr (instr::traits[Op].stack_height_change > 0)
     {
         static_assert(instr::traits[Op].stack_height_change == 1);
-        if (INTX_UNLIKELY(stack_size == Stack::limit))
-            return EVMC_STACK_OVERFLOW;
+        if (stack_size == Stack::limit)
+            return false;
     }
     if constexpr (instr::traits[Op].stack_height_required > 0)
     {
-        if (INTX_UNLIKELY(stack_size < instr::traits[Op].stack_height_required))
-            return EVMC_STACK_UNDERFLOW;
+        if (stack_size < instr::traits[Op].stack_height_required)
+            return false;
     }
-    return EVMC_SUCCESS;
+    return true;
 }
 
 template <evmc_opcode Op>
@@ -138,8 +138,8 @@ evmc_status_code invoke(const uint256* stack_bottom, uint256* stack_top, code_it
         return status;
 
     const auto stack_size = stack_top - stack_bottom;
-    if (const auto status = check_stack<Op>(stack_size); INTX_UNLIKELY(status != EVMC_SUCCESS))
-        return status;
+    if (INTX_UNLIKELY(!check_stack<Op>(stack_size)))
+        return stack_size < Stack::limit ? EVMC_STACK_UNDERFLOW : EVMC_STACK_OVERFLOW;
 
     if (state.gas_left = check_gas<Op>(state.gas_left, state.rev);
         INTX_UNLIKELY(state.gas_left < 0))
