@@ -94,15 +94,12 @@ inline evmc_status_code check_stack(ptrdiff_t stack_size) noexcept
 }
 
 template <evmc_opcode Op>
-inline evmc_status_code check_gas(int64_t& gas_left, evmc_revision rev) noexcept
+inline int64_t check_gas(int64_t gas_left, evmc_revision rev) noexcept
 {
     auto gas_cost = instr::gas_costs[EVMC_FRONTIER][Op];  // Init assuming const cost.
     if constexpr (!instr::has_const_gas_cost(Op))
         gas_cost = instr::gas_costs[rev][Op];  // If not, load the cost from the table.
-    if (INTX_UNLIKELY((gas_left -= gas_cost) < 0))
-        return EVMC_OUT_OF_GAS;
-
-    return EVMC_SUCCESS;
+    return gas_left - gas_cost;
 }
 
 template <evmc_opcode Op>
@@ -144,9 +141,9 @@ evmc_status_code invoke(const uint256* stack_bottom, uint256* stack_top, code_it
     if (const auto status = check_stack<Op>(stack_size); INTX_UNLIKELY(status != EVMC_SUCCESS))
         return status;
 
-    if (const auto status = check_gas<Op>(state.gas_left, state.rev);
-        INTX_UNLIKELY(status != EVMC_SUCCESS))
-        return status;
+    if (state.gas_left = check_gas<Op>(state.gas_left, state.rev);
+        INTX_UNLIKELY(state.gas_left < 0))
+        return EVMC_OUT_OF_GAS;
 
     code_it = invoke(instr::core::impl<Op>, stack_top, code_it, state);
     if (!code_it)
