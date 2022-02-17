@@ -80,7 +80,7 @@ inline bool check_stack(ptrdiff_t stack_size) noexcept
 
 inline constexpr bool has_const_gas_cost_since_defined(evmc_opcode op) noexcept
 {
-    const auto first_rev = *instr::traits[op].since;
+    const size_t first_rev = *instr::traits[op].since;
     const auto g = instr::gas_costs[first_rev][op];
     for (size_t r = first_rev + 1; r <= EVMC_MAX_REVISION; ++r)
     {
