@@ -53,6 +53,9 @@ evmc_result execute(
     const auto first_fn = tbl[*code_it];
     state.stack_bottom = state.stack.top_item;
     auto stack_top = state.stack.top_item;
+
+    asm volatile("":::"r10","r11","r12","r13","r14","r15","rbx");
+
     const auto status = first_fn(stack_top, code_it, state.gas_left, state);
 
     const auto gas_left = (status == EVMC_SUCCESS || status == EVMC_REVERT) ? state.gas_left : 0;

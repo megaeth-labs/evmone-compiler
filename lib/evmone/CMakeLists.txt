@@ -52,6 +52,17 @@ set_target_properties(
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_SOVERSION}
 )
+set_source_files_properties(
+    caterpillar.cpp PROPERTIES
+#    COMPILE_OPTIONS "-fcall-saved-r10"
+#    COMPILE_OPTIONS "-fcall-used-r10;-fcall-used-r11;-fcall-used-r12;-fcall-used-r13;-fcall-used-r14;-fcall-used-r15"
+)
+set_source_files_properties(
+    caterpillar_instructions.cpp PROPERTIES
+#    COMPILE_OPTIONS "-fcall-used-r10"
+    #    COMPILE_OPTIONS "-fcall-saved-r15"
+    COMPILE_OPTIONS "-fcall-used-r10;-fcall-used-r11;-fcall-used-r12;-fcall-used-r13;-fcall-used-r14;-fcall-used-r15;-fcall-used-rbx"
+)
 
 if(NOT SANITIZE)
     # On Linux, check if all symbols in evmone are resolved during linking.
