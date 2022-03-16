@@ -20,6 +20,7 @@ add_library(evmone
     baseline_instruction_table.hpp
     caterpillar.cpp
     caterpillar.hpp
+    caterpillar_instructions.cpp
     instructions.hpp
     instructions_calls.cpp
     instructions_traits.hpp
