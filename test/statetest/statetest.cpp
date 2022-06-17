@@ -62,7 +62,29 @@ int main(int argc, char* argv[])
     {
         evmc::VM vm{evmc_create_evmone(), {{"O", "0"}, /*{"trace", "1"}*/}};
 
+        static constexpr std::string_view filter_flag_name = "--gtest_filter";
+        const auto has_user_filter =
+            std::find_if(argv, argv + argc, [](std::string_view arg) noexcept {
+                return arg.starts_with(filter_flag_name);
+            }) != (argv + argc);
+
         testing::InitGoogleTest(&argc, argv);  // Process GoogleTest flags.
+
+        if (!has_user_filter)
+        {
+            // Set default test filter if none provided.
+            // To enable all tests use `--gtest_filter=*`.
+            testing::FLAGS_gtest_filter =
+                "-"
+                // Slow tests:
+                "stCreateTest.CreateOOGafterMaxCodesize:"      // pass
+                "stQuadraticComplexityTest.Call50000_sha256:"  // pass
+                "stTimeConsuming.static_Call50000_sha256:"     // pass
+                "stTimeConsuming.CALLBlake2f_MaxRounds:"       // pass
+                "VMTests/vmPerformance.*:"                     // pass
+                ;
+        }
+
         for (int i = 1; i < argc; ++i)
             register_test_files(argv[i], vm);
         return RUN_ALL_TESTS();
