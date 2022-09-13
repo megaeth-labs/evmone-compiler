@@ -24,7 +24,15 @@ struct JournalTouched
     address addr;
 };
 
-using JournalEntry = std::variant<JournalBalanceChange, JournalTouched>;
+struct JournalStorageChange
+{
+    address addr;
+    bytes32 key;
+    bytes32 prev_value;
+    evmc_access_status prev_access_status;
+};
+
+using JournalEntry = std::variant<JournalBalanceChange, JournalTouched, JournalStorageChange>;
 
 class State
 {
@@ -65,6 +73,11 @@ public:
     }
 
     void journal_touched(const address& addr) { m_journal.emplace_back(JournalTouched{addr}); }
+
+    void journal_storage_change(const address& addr, const bytes32& key, const StorageValue& value)
+    {
+        m_journal.emplace_back(JournalStorageChange{addr, key, value.current, value.access_status});
+    }
 };
 
 struct BlockInfo

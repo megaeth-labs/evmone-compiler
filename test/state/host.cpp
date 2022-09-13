@@ -82,6 +82,7 @@ evmc_storage_status Host::set_storage(
     }
 
     hitmap.tbl[m_rev][status] = true;
+    m_state.journal_storage_change(addr, key, storage_slot);
     storage_slot.current = value;  // Update current value.
     return status;
 }
@@ -396,6 +397,7 @@ evmc_access_status Host::access_storage(const address& addr, const bytes32& key)
             return EVMC_ACCESS_WARM;
     }
 
+    m_state.journal_storage_change(addr, key, m_state.get(addr).storage[key]);
     return std::exchange(m_state.get(addr).storage[key].access_status, EVMC_ACCESS_WARM);
 }
 }  // namespace evmone::state
