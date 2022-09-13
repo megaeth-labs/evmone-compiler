@@ -119,6 +119,8 @@ size_t Host::copy_code(const address& addr, size_t code_offset, uint8_t* buffer_
 bool Host::selfdestruct(const address& addr, const address& beneficiary) noexcept
 {
     auto& beneficiary_acc = m_state.get_or_create(beneficiary);
+    if (!beneficiary_acc.touched)
+        m_state.journal_touched(beneficiary);
     beneficiary_acc.touched = true;
 
     // Immediately transfer all balance to beneficiary.
@@ -266,6 +268,8 @@ evmc::Result Host::execute_message(const evmc_message& msg) noexcept
         // TODO: Should not create empty touched account?
         assert(evmc::address{msg.recipient} == msg.code_address);
         auto& recipient_acc = code_acc != nullptr ? *code_acc : m_state.create(msg.recipient);
+        if (!recipient_acc.touched)
+            m_state.journal_touched(msg.recipient);
         recipient_acc.touched = true;
 
         // Transfer value.

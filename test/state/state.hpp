@@ -19,7 +19,12 @@ struct JournalBalanceChange
     intx::uint256 prev_balance;
 };
 
-using JournalEntry = std::variant<JournalBalanceChange>;
+struct JournalTouched
+{
+    address addr;
+};
+
+using JournalEntry = std::variant<JournalBalanceChange, JournalTouched>;
 
 class State
 {
@@ -58,6 +63,8 @@ public:
     {
         m_journal.emplace_back(JournalBalanceChange{addr, prev_balance});
     }
+
+    void journal_touched(const address& addr) { m_journal.emplace_back(JournalTouched{addr}); }
 };
 
 struct BlockInfo
