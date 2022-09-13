@@ -8,13 +8,24 @@
 #include "hash_utils.hpp"
 #include <optional>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace evmone::state
 {
+struct JournalBalanceChange
+{
+    address addr;
+    intx::uint256 prev_balance;
+};
+
+using JournalEntry = std::variant<JournalBalanceChange>;
+
 class State
 {
     std::unordered_map<address, Account> m_accounts;
+
+    std::vector<JournalEntry> m_journal;
 
 public:
     /// Creates new account under the address.
@@ -42,6 +53,11 @@ public:
     Account& get_or_create(const address& addr) { return m_accounts[addr]; }
 
     auto& get_accounts() { return m_accounts; }
+
+    void journal_balance_change(const address& addr, const intx::uint256& prev_balance)
+    {
+        m_journal.emplace_back(JournalBalanceChange{addr, prev_balance});
+    }
 };
 
 struct BlockInfo
