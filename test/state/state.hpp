@@ -32,7 +32,13 @@ struct JournalStorageChange
     evmc_access_status prev_access_status;
 };
 
-using JournalEntry = std::variant<JournalBalanceChange, JournalTouched, JournalStorageChange>;
+struct JournalNonceBump
+{
+    address addr;
+};
+
+using JournalEntry =
+    std::variant<JournalBalanceChange, JournalTouched, JournalStorageChange, JournalNonceBump>;
 
 class State
 {
@@ -78,6 +84,8 @@ public:
     {
         m_journal.emplace_back(JournalStorageChange{addr, key, value.current, value.access_status});
     }
+
+    void journal_bump_nonce(const address& addr) { m_journal.emplace_back(JournalNonceBump{addr}); }
 };
 
 struct BlockInfo
