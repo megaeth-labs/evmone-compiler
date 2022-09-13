@@ -37,8 +37,14 @@ struct JournalNonceBump
     address addr;
 };
 
-using JournalEntry =
-    std::variant<JournalBalanceChange, JournalTouched, JournalStorageChange, JournalNonceBump>;
+struct JournalCreate
+{
+    address addr;
+    bool existed;
+};
+
+using JournalEntry = std::variant<JournalBalanceChange, JournalTouched, JournalStorageChange,
+    JournalNonceBump, JournalCreate>;
 
 class State
 {
@@ -86,6 +92,15 @@ public:
     }
 
     void journal_bump_nonce(const address& addr) { m_journal.emplace_back(JournalNonceBump{addr}); }
+
+    void journal_create(const address& addr, bool existed)
+    {
+        m_journal.emplace_back(JournalCreate{addr, existed});
+    }
+
+    size_t get_journal_checkpoint() const noexcept { return m_journal.size(); }
+
+    void journal_rollback(size_t checkpoint) noexcept;
 };
 
 struct BlockInfo

@@ -119,6 +119,9 @@ size_t Host::copy_code(const address& addr, size_t code_offset, uint8_t* buffer_
 
 bool Host::selfdestruct(const address& addr, const address& beneficiary) noexcept
 {
+    if (m_state.get_or_null(beneficiary) == nullptr)
+        m_state.journal_create(beneficiary, false);
+
     auto& beneficiary_acc = m_state.get_or_create(beneficiary);
     if (!beneficiary_acc.touched)
         m_state.journal_touched(beneficiary);
@@ -197,10 +200,18 @@ evmc::Result Host::create(const evmc_message& msg) noexcept
         collision_acc != nullptr && (collision_acc->nonce != 0 || !collision_acc->code.empty()))
         return evmc::Result{EVMC_OUT_OF_GAS, 0, 0, new_addr};
 
+    const bool exists = m_state.get_or_null(new_addr) != nullptr;
     auto& new_acc = m_state.get_or_create(new_addr);
+    m_state.journal_create(new_addr, exists);
     if (m_rev >= EVMC_SPURIOUS_DRAGON)
         new_acc.nonce = 1;
-    new_acc.storage.clear();  // In case of collision.
+
+    // Clear storage in case of collision.
+    for (auto& s : new_acc.storage)
+    {
+        m_state.journal_storage_change(new_addr, s.first, s.second);
+        s.second = {};  // TODO: Storage access status may be untested.
+    }
 
     const auto value = intx::be::load<intx::uint256>(msg.value);
     assert(sender_acc.balance >= value && "EVM must guarantee balance");
@@ -270,7 +281,9 @@ evmc::Result Host::execute_message(const evmc_message& msg) noexcept
         // TODO: Should not create empty touched account?
         assert(evmc::address{msg.recipient} == msg.code_address);
         auto& recipient_acc = code_acc != nullptr ? *code_acc : m_state.create(msg.recipient);
-        if (!recipient_acc.touched)
+        if (code_acc == nullptr)
+            m_state.journal_create(msg.recipient, false);
+        else if (!recipient_acc.touched)
             m_state.journal_touched(msg.recipient);
         recipient_acc.touched = true;
 
