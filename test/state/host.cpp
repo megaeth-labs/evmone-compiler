@@ -310,6 +310,7 @@ evmc::Result Host::call(const evmc_message& msg) noexcept
     auto destructs_snapshot = m_destructs.size();
     auto access_addresses_snapshot = m_accessed_addresses;
     auto logs_snapshot = m_logs.size();
+    const auto journal_checkpoint = m_state.get_journal_checkpoint();
 
     auto result = execute_message(msg);
 
@@ -320,7 +321,57 @@ evmc::Result Host::call(const evmc_message& msg) noexcept
         const auto is_03_touched = acc_03 != nullptr && acc_03->touched;
 
         // Revert.
-        m_state = std::move(state_snapshot);
+        m_state.journal_rollback(journal_checkpoint);
+
+        const auto& sa = m_state.get_accounts();
+        const auto& sb = state_snapshot.get_accounts();
+        // assert(sa.size() >= sb.size());
+        // assert(sa.size() <= sb.size());
+        for (const auto& [addr, a] : sa)
+        {
+            auto it = sb.find(addr);
+            if (it == sb.end())
+            {
+                if (!a.is_empty())
+                {
+                    std::cerr << hex(addr) << " " << a.nonce << " " << to_string(a.balance) << "\n";
+                }
+                assert(a.is_empty());
+            }
+            else
+            {
+                auto& b = it->second;
+                assert(a.balance == b.balance);
+                if (a.nonce != b.nonce)
+                {
+                    std::cerr << hex(addr) << ": " << a.nonce << " vs " << b.nonce << "\n";
+                    assert(a.nonce == b.nonce);
+                }
+
+                if (a.touched != b.touched)
+                {
+                    std::cerr << hex(addr) << ": " << a.touched << " vs " << b.touched << "\n";
+                    assert(a.touched == b.touched);
+                }
+
+                for (const auto& s : a.storage)
+                {
+                    auto t = b.storage.find(s.first);
+                    if (t == b.storage.end())
+                    {
+                        assert(evmc::is_zero(s.second.current));
+                        assert(s.second.access_status == EVMC_ACCESS_COLD);
+                    }
+                    else
+                    {
+                        assert(s.second.current == t->second.current);
+                        assert(s.second.access_status == t->second.access_status);
+                    }
+                }
+            }
+        }
+
+        // m_state = std::move(state_snapshot);
         m_destructs.resize(destructs_snapshot);
         m_accessed_addresses = std::move(access_addresses_snapshot);
         m_logs.resize(logs_snapshot);

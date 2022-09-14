@@ -80,6 +80,41 @@ evmc_message build_message(const Transaction& tx, int64_t execution_gas_limit) n
 }
 }  // namespace
 
+void State::journal_rollback(size_t checkpoint) noexcept
+{
+    while (m_journal.size() != checkpoint)
+    {
+        std::visit(
+            [this](const auto& e) {
+                using T = std::decay_t<decltype(e)>;
+                if constexpr (std::is_same_v<T, JournalNonceBump>)
+                    get(e.addr).nonce -= 1;
+                else if constexpr (std::is_same_v<T, JournalTouched>)
+                    get(e.addr).touched = false;
+                else if constexpr (std::is_same_v<T, JournalCreate>)
+                {
+                    auto& a = get(e.addr);
+                    a.nonce = 0;
+                    a.code.clear();
+                    if (!e.existed)
+                        m_accounts.erase(e.addr);
+                }
+                else if constexpr (std::is_same_v<T, JournalStorageChange>)
+                {
+                    auto& s = get(e.addr).storage.find(e.key)->second;
+                    s.current = e.prev_value;
+                    s.access_status = e.prev_access_status;
+                }
+                else if constexpr (std::is_same_v<T, JournalBalanceChange>)
+                {
+                    get(e.addr).balance = e.prev_balance;
+                }
+            },
+            m_journal.back());
+        m_journal.pop_back();
+    }
+}
+
 std::optional<std::vector<Log>> transition(
     State& state, const BlockInfo& block, const Transaction& tx, evmc_revision rev, evmc::VM& vm)
 {
