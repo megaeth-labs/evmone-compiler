@@ -299,8 +299,7 @@ evmc::Result Host::execute_message(const evmc_message& msg) noexcept
     if (auto precompiled_result = call_precompile(m_rev, msg); precompiled_result.has_value())
         return std::move(*precompiled_result);
 
-    // Copy of the code. Revert will invalidate the account.
-    const auto code = code_acc != nullptr ? code_acc->code : bytes{};
+    const auto code = code_acc != nullptr ? bytes_view{code_acc->code} : bytes_view{};
     return m_vm.execute(*this, m_rev, msg, code.data(), code.size());
 }
 

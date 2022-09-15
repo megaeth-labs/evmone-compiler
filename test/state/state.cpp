@@ -183,7 +183,7 @@ std::optional<std::vector<Log>> transition(
     const auto sender_fee = gas_used * effective_gas_price;
     const auto producer_pay = gas_used * priority_gas_price;
 
-    state.get(tx.sender).balance += tx_max_cost - sender_fee;
+    sender_acc.balance += tx_max_cost - sender_fee;
 
     auto& coinbase_acc = state.get_or_create(block.coinbase);
     coinbase_acc.balance += producer_pay;
