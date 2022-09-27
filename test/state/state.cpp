@@ -88,7 +88,7 @@ void State::journal_rollback(size_t checkpoint) noexcept
             [this](const auto& e) {
                 using T = std::decay_t<decltype(e)>;
                 if constexpr (std::is_same_v<T, JournalNonceBump>)
-                    get(e.addr).nonce -= 1;
+                    e.a->nonce -= 1;
                 else if constexpr (std::is_same_v<T, JournalTouched>)
                     get(e.addr).touched = false;
                 else if constexpr (std::is_same_v<T, JournalCreate>)

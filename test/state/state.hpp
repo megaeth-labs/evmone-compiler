@@ -34,7 +34,7 @@ struct JournalStorageChange
 
 struct JournalNonceBump
 {
-    address addr;
+    Account* a;
 };
 
 struct JournalCreate
@@ -91,7 +91,7 @@ public:
         m_journal.emplace_back(JournalStorageChange{addr, key, value.current, value.access_status});
     }
 
-    void journal_bump_nonce(const address& addr) { m_journal.emplace_back(JournalNonceBump{addr}); }
+    void journal_bump_nonce(Account& a) { m_journal.emplace_back(JournalNonceBump{&a}); }
 
     void journal_create(const address& addr, bool existed)
     {
