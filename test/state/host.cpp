@@ -132,8 +132,8 @@ bool Host::selfdestruct(const address& addr, const address& beneficiary) noexcep
     // can be increased with a call following previous selfdestruct.
     if (auto& acc = m_state.get(addr); acc.balance != 0)
     {
-        m_state.journal_balance_change(beneficiary, beneficiary_acc.balance);
-        m_state.journal_balance_change(addr, acc.balance);
+        m_state.journal_balance_change(beneficiary_acc);
+        m_state.journal_balance_change(acc);
         beneficiary_acc.balance += acc.balance;  // Already touched.
         acc.balance = 0;
     }
@@ -215,8 +215,8 @@ evmc::Result Host::create(const evmc_message& msg) noexcept
 
     const auto value = intx::be::load<intx::uint256>(msg.value);
     assert(sender_acc.balance >= value && "EVM must guarantee balance");
-    m_state.journal_balance_change(msg.sender, sender_acc.balance);
-    m_state.journal_balance_change(new_addr, new_acc.balance);
+    m_state.journal_balance_change(sender_acc);
+    m_state.journal_balance_change(new_acc);
     sender_acc.balance -= value;
     new_acc.balance += value;  // The new account may be prefunded.
 
@@ -289,10 +289,11 @@ evmc::Result Host::execute_message(const evmc_message& msg) noexcept
 
         // Transfer value.
         const auto value = intx::be::load<intx::uint256>(msg.value);
-        assert(m_state.get(msg.sender).balance >= value);
-        m_state.journal_balance_change(msg.sender, m_state.get(msg.sender).balance);
-        m_state.journal_balance_change(msg.recipient, recipient_acc.balance);
-        m_state.get(msg.sender).balance -= value;
+        auto& sender_acc = m_state.get(msg.sender);
+        assert(sender_acc.balance >= value);
+        m_state.journal_balance_change(sender_acc);
+        m_state.journal_balance_change(recipient_acc);
+        sender_acc.balance -= value;
         recipient_acc.balance += value;
     }
 

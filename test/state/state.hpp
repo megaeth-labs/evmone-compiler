@@ -15,7 +15,7 @@ namespace evmone::state
 {
 struct JournalBalanceChange
 {
-    address addr;
+    Account* a;
     intx::uint256 prev_balance;
 };
 
@@ -81,9 +81,9 @@ public:
 
     auto& get_accounts() { return m_accounts; }
 
-    void journal_balance_change(const address& addr, const intx::uint256& prev_balance)
+    void journal_balance_change(Account& a)
     {
-        m_journal.emplace_back(JournalBalanceChange{addr, prev_balance});
+        m_journal.emplace_back(JournalBalanceChange{&a, a.balance});
     }
 
     void journal_touched(Account& a) { m_journal.emplace_back(JournalTouched{&a}); }

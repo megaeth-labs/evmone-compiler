@@ -107,7 +107,7 @@ void State::journal_rollback(size_t checkpoint) noexcept
                 }
                 else if constexpr (std::is_same_v<T, JournalBalanceChange>)
                 {
-                    get(e.addr).balance = e.prev_balance;
+                    e.a->balance = e.prev_balance;
                 }
             },
             m_journal.back());
