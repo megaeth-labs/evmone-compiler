@@ -26,8 +26,7 @@ struct JournalTouched
 
 struct JournalStorageChange
 {
-    address addr;
-    bytes32 key;
+    std::unordered_map<bytes32, StorageValue>::pointer p;
     bytes32 prev_value;
     evmc_access_status prev_access_status;
 };
@@ -46,7 +45,7 @@ struct JournalCreate
 using JournalEntry = std::variant<JournalBalanceChange, JournalTouched, JournalStorageChange,
     JournalNonceBump, JournalCreate>;
 
-static_assert(sizeof(JournalEntry) == 8 * 12);
+static_assert(sizeof(JournalEntry) == 8 * 7);
 
 class State
 {
@@ -88,9 +87,9 @@ public:
 
     void journal_touched(Account& a) { m_journal.emplace_back(JournalTouched{&a}); }
 
-    void journal_storage_change(const address& addr, const bytes32& key, const StorageValue& value)
+    void journal_storage_change(std::unordered_map<bytes32, StorageValue>::value_type& v)
     {
-        m_journal.emplace_back(JournalStorageChange{addr, key, value.current, value.access_status});
+        m_journal.emplace_back(JournalStorageChange{&v, v.second.current, v.second.access_status});
     }
 
     void journal_bump_nonce(Account& a) { m_journal.emplace_back(JournalNonceBump{&a}); }

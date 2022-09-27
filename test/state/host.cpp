@@ -46,8 +46,9 @@ evmc_storage_status Host::set_storage(
     // Follow EVMC documentation https://evmc.ethereum.org/storagestatus.html#autotoc_md3
     // and EIP-2200 specification https://eips.ethereum.org/EIPS/eip-2200.
 
-    auto& storage_slot = m_state.get(addr).storage[key];
-    const auto& [current, original, _] = storage_slot;
+    auto [it, _] = m_state.get(addr).storage.insert_or_assign(key, StorageValue{});
+    auto& storage_slot = it->second;
+    const auto& [current, original, _2] = storage_slot;
 
     const auto dirty = original != current;
     const auto restored = original == value;
@@ -82,7 +83,7 @@ evmc_storage_status Host::set_storage(
     }
 
     hitmap.tbl[m_rev][status] = true;
-    m_state.journal_storage_change(addr, key, storage_slot);
+    m_state.journal_storage_change(*it);
     storage_slot.current = value;  // Update current value.
     return status;
 }
@@ -207,10 +208,10 @@ evmc::Result Host::create(const evmc_message& msg) noexcept
         new_acc.nonce = 1;
 
     // Clear storage in case of collision.
-    for (auto& s : new_acc.storage)
+    for (auto it = new_acc.storage.begin(); it != new_acc.storage.end(); ++it)
     {
-        m_state.journal_storage_change(new_addr, s.first, s.second);
-        s.second = {};  // TODO: Storage access status may be untested.
+        m_state.journal_storage_change(*it);
+        it->second = {};  // TODO: Storage access status may be untested.
     }
 
     const auto value = intx::be::load<intx::uint256>(msg.value);
@@ -415,7 +416,8 @@ evmc_access_status Host::access_storage(const address& addr, const bytes32& key)
             return EVMC_ACCESS_WARM;
     }
 
-    m_state.journal_storage_change(addr, key, m_state.get(addr).storage[key]);
-    return std::exchange(m_state.get(addr).storage[key].access_status, EVMC_ACCESS_WARM);
+    auto [it, _] = m_state.get(addr).storage.insert_or_assign(key, StorageValue{});
+    m_state.journal_storage_change(*it);
+    return std::exchange(it->second.access_status, EVMC_ACCESS_WARM);
 }
 }  // namespace evmone::state

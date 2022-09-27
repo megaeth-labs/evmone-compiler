@@ -101,9 +101,8 @@ void State::journal_rollback(size_t checkpoint) noexcept
                 }
                 else if constexpr (std::is_same_v<T, JournalStorageChange>)
                 {
-                    auto& s = get(e.addr).storage.find(e.key)->second;
-                    s.current = e.prev_value;
-                    s.access_status = e.prev_access_status;
+                    e.p->second.current = e.prev_value;
+                    e.p->second.access_status = e.prev_access_status;
                 }
                 else if constexpr (std::is_same_v<T, JournalBalanceChange>)
                 {
