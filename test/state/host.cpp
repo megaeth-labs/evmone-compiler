@@ -124,7 +124,7 @@ bool Host::selfdestruct(const address& addr, const address& beneficiary) noexcep
 
     auto& beneficiary_acc = m_state.get_or_create(beneficiary);
     if (!beneficiary_acc.touched)
-        m_state.journal_touched(beneficiary);
+        m_state.journal_touched(beneficiary_acc);
     beneficiary_acc.touched = true;
 
     // Immediately transfer all balance to beneficiary.
@@ -284,7 +284,7 @@ evmc::Result Host::execute_message(const evmc_message& msg) noexcept
         if (code_acc == nullptr)
             m_state.journal_create(msg.recipient, false);
         else if (!recipient_acc.touched)
-            m_state.journal_touched(msg.recipient);
+            m_state.journal_touched(recipient_acc);
         recipient_acc.touched = true;
 
         // Transfer value.

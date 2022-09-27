@@ -90,7 +90,7 @@ void State::journal_rollback(size_t checkpoint) noexcept
                 if constexpr (std::is_same_v<T, JournalNonceBump>)
                     e.a->nonce -= 1;
                 else if constexpr (std::is_same_v<T, JournalTouched>)
-                    get(e.addr).touched = false;
+                    e.a->touched = false;
                 else if constexpr (std::is_same_v<T, JournalCreate>)
                 {
                     auto& a = get(e.addr);

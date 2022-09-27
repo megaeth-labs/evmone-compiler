@@ -21,7 +21,7 @@ struct JournalBalanceChange
 
 struct JournalTouched
 {
-    address addr;
+    Account* a;
 };
 
 struct JournalStorageChange
@@ -45,6 +45,8 @@ struct JournalCreate
 
 using JournalEntry = std::variant<JournalBalanceChange, JournalTouched, JournalStorageChange,
     JournalNonceBump, JournalCreate>;
+
+static_assert(sizeof(JournalEntry) == 8 * 12);
 
 class State
 {
@@ -84,7 +86,7 @@ public:
         m_journal.emplace_back(JournalBalanceChange{addr, prev_balance});
     }
 
-    void journal_touched(const address& addr) { m_journal.emplace_back(JournalTouched{addr}); }
+    void journal_touched(Account& a) { m_journal.emplace_back(JournalTouched{&a}); }
 
     void journal_storage_change(const address& addr, const bytes32& key, const StorageValue& value)
     {
