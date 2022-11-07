@@ -86,6 +86,28 @@ CodeAnalysis analyze(evmc_revision rev, bytes_view code)
 
 namespace
 {
+inline constexpr bool subtract_gas_cost(int64_t& gas_left, int64_t gas_cost) noexcept
+{
+#if __has_builtin(__builtin_usubl_overflow)
+    // Use builtin to workaround clang optimization issue
+    // https://github.com/llvm/llvm-project/issues/58636.
+    // Not needed for GCC, but does no harm.
+    uint64_t d = 0;
+    const auto o = __builtin_usubl_overflow(
+        static_cast<uint64_t>(gas_left), static_cast<uint64_t>(gas_cost), &d);
+    if (INTX_UNLIKELY(o))
+        return false;
+    gas_left = static_cast<int64_t>(d);
+    return true;
+#else
+    const auto d = gas_left - gas_cost;
+    if (INTX_UNLIKELY(d < 0))
+        return false;
+    gas_left = d;
+    return true;
+#endif
+}
+
 /// Checks instruction requirements before execution.
 ///
 /// This checks:
@@ -137,13 +159,9 @@ inline evmc_status_code check_requirements(const CostTable& cost_table, int64_t&
             return EVMC_STACK_UNDERFLOW;
     }
 
-    uint64_t h;
-    const auto o = __builtin_usubl_overflow(
-        static_cast<uint64_t>(gas_left), static_cast<uint64_t>(gas_cost), &h);
-    if (INTX_UNLIKELY(o))
+    if (INTX_UNLIKELY(!subtract_gas_cost(gas_left, gas_cost)))
         return EVMC_OUT_OF_GAS;
 
-    gas_left = static_cast<int64_t>(h);
     return EVMC_SUCCESS;
 }
 
