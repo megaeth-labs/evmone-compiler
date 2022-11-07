@@ -86,14 +86,7 @@ CodeAnalysis analyze(evmc_revision rev, bytes_view code)
 
 namespace
 {
-inline constexpr bool subtract_gas_cost(int64_t& gas_left, int64_t gas_cost) noexcept
-{
-    const auto d = gas_left - gas_cost;
-    if (INTX_UNLIKELY(d < 0))
-        return false;
-    gas_left = d;
-    return true;
-}
+
 
 /// Checks instruction requirements before execution.
 ///
