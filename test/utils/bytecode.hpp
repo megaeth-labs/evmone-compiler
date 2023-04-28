@@ -6,6 +6,7 @@
 #include <evmc/evmc.hpp>
 #include <evmone/instructions_traits.hpp>
 #include <intx/intx.hpp>
+#include <test/state/hash_utils.hpp>
 #include <test/utils/utils.hpp>
 #include <algorithm>
 #include <ostream>
