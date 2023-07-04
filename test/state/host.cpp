@@ -138,27 +138,58 @@ address compute_new_account_address(const address& sender, uint64_t sender_nonce
     return new_addr;
 }
 
+static address compute_new_account_create3_address(
+    const evmc_message& msg, bytes_view initcontainer) noexcept
+{
+    assert(msg.kind == EVMC_CREATE3);
+
+    const auto initcontainer_hash = keccak256(initcontainer);
+    const auto buffer_size =
+        1 + sizeof(msg.sender) + sizeof(msg.create2_salt) + sizeof(initcontainer_hash);
+    bytes buffer;
+    buffer.reserve(buffer_size);
+    buffer += uint8_t{0xff};
+    buffer += bytes_view{msg.sender.bytes, std::size(msg.sender.bytes)};
+    buffer += bytes_view{msg.create2_salt.bytes, std::size(msg.create2_salt.bytes)};
+    buffer += bytes_view{initcontainer_hash.bytes, std::size(initcontainer_hash.bytes)};
+
+    const auto addr_base_hash = keccak256(buffer);
+
+    evmc_address new_addr{};
+    std::copy_n(&addr_base_hash.bytes[12], sizeof(new_addr), new_addr.bytes);
+    return new_addr;
+}
+
 std::optional<evmc_message> Host::prepare_message(evmc_message msg)
 {
     auto& sender_acc = m_state.get(msg.sender);
     const auto sender_nonce = sender_acc.nonce;
 
     // Bump sender nonce.
-    if (msg.depth == 0 || msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2)
+    if (msg.depth == 0 || msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2 ||
+        msg.kind == EVMC_CREATE3)
     {
         if (sender_nonce == Account::NonceMax)
             return {};  // Light early exception, cannot happen for depth == 0.
         ++sender_acc.nonce;
     }
 
-    if (msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2)
+    if (msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2 || msg.kind == EVMC_CREATE3)
     {
         // Compute and fill create address.
         assert(msg.recipient == address{});
         assert(msg.code_address == address{});
-        msg.recipient = compute_new_account_address(msg.sender, sender_nonce,
-            (msg.kind == EVMC_CREATE2) ? std::optional{msg.create2_salt} : std::nullopt,
-            {msg.input_data, msg.input_size});
+        if (msg.kind == EVMC_CREATE3)
+        {
+            const bytes_view initcontainer{msg.init_code, msg.init_code_size};
+            msg.recipient = compute_new_account_create3_address(msg, initcontainer);
+        }
+        else
+        {
+            msg.recipient = compute_new_account_address(msg.sender, sender_nonce,
+                (msg.kind == EVMC_CREATE2) ? std::optional{msg.create2_salt} : std::nullopt,
+                {msg.input_data, msg.input_size});
+        }
 
         // By EIP-2929, the  access to new created address is never reverted.
         access_account(msg.recipient);
@@ -169,7 +200,7 @@ std::optional<evmc_message> Host::prepare_message(evmc_message msg)
 
 evmc::Result Host::create(const evmc_message& msg) noexcept
 {
-    assert(msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2);
+    assert(msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2 || msg.kind == EVMC_CREATE3);
 
     // Check collision as defined in pseudo-EIP https://github.com/ethereum/EIPs/issues/684.
     // All combinations of conditions (nonce, code, storage) are tested.
@@ -195,9 +226,14 @@ evmc::Result Host::create(const evmc_message& msg) noexcept
     new_acc.balance += value;  // The new account may be prefunded.
 
     auto create_msg = msg;
-    const bytes_view initcode{msg.input_data, msg.input_size};
-    create_msg.input_data = nullptr;
-    create_msg.input_size = 0;
+    const auto initcode =
+        (msg.kind == EVMC_CREATE3 ? bytes_view{msg.init_code, msg.init_code_size} :
+                                    bytes_view{msg.input_data, msg.input_size});
+    if (msg.kind != EVMC_CREATE3)
+    {
+        create_msg.input_data = nullptr;
+        create_msg.input_size = 0;
+    }
 
     if (m_rev >= EVMC_PRAGUE && (is_eof_container(initcode) || is_eof_container(sender_acc.code)))
     {
@@ -205,7 +241,7 @@ evmc::Result Host::create(const evmc_message& msg) noexcept
             return evmc::Result{EVMC_CONTRACT_VALIDATION_FAILURE};
     }
 
-    auto result = m_vm.execute(*this, m_rev, create_msg, msg.input_data, msg.input_size);
+    auto result = m_vm.execute(*this, m_rev, create_msg, initcode.data(), initcode.size());
     if (result.status_code != EVMC_SUCCESS)
     {
         result.create_address = msg.recipient;
@@ -216,6 +252,11 @@ evmc::Result Host::create(const evmc_message& msg) noexcept
     assert(gas_left >= 0);
 
     const bytes_view code{result.output_data, result.output_size};
+
+    // for CREATE3 successful result is guaranteed to be non-empty
+    // because container section is not allowed to be empty
+    assert(msg.kind != EVMC_CREATE3 || result.status_code != EVMC_SUCCESS || !code.empty());
+
     if (m_rev >= EVMC_SPURIOUS_DRAGON && code.size() > max_code_size)
         return evmc::Result{EVMC_FAILURE};
 
@@ -245,7 +286,7 @@ evmc::Result Host::create(const evmc_message& msg) noexcept
 
 evmc::Result Host::execute_message(const evmc_message& msg) noexcept
 {
-    if (msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2)
+    if (msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2 || msg.kind == EVMC_CREATE3)
         return create(msg);
 
     assert(msg.kind != EVMC_CALL || evmc::address{msg.recipient} == msg.code_address);
