@@ -135,6 +135,17 @@ std::variant<int64_t, std::error_code> validate_transaction(const Account& sende
     return execution_gas_limit;
 }
 
+namespace
+{
+void clear_empty_accounts(State& state)
+{
+    std::erase_if(state.get_accounts(), [](const std::pair<const address, Account>& p) noexcept {
+        const auto& acc = p.second;
+        return acc.erasable && acc.is_empty();
+    });
+}
+}  // namespace
+
 void finalize(State& state, evmc_revision rev, const address& coinbase,
     std::optional<uint64_t> block_reward, std::span<const Ommer> ommers,
     std::span<const Withdrawal> withdrawals)
@@ -158,14 +169,9 @@ void finalize(State& state, evmc_revision rev, const address& coinbase,
     for (const auto& withdrawal : withdrawals)
         state.touch(withdrawal.recipient).balance += withdrawal.get_amount();
 
+    // Empty accounts need to be clear because is 'block_reward' coinbase should be removed.
     if (rev >= EVMC_SPURIOUS_DRAGON)
-    {
-        std::erase_if(
-            state.get_accounts(), [](const std::pair<const address, Account>& p) noexcept {
-                const auto& acc = p.second;
-                return acc.erasable && acc.is_empty();
-            });
-    }
+        clear_empty_accounts(state);
 }
 
 std::variant<TransactionReceipt, std::error_code> transition(State& state, const BlockInfo& block,
@@ -240,6 +246,11 @@ std::variant<TransactionReceipt, std::error_code> transition(State& state, const
 
     // Cannot put it into constructor call because logs are std::moved from host instance.
     receipt.logs_bloom_filter = compute_bloom_filter(receipt.logs);
+
+    // Empty accounts need to be cleared here to properly calculate post state hash which is a part
+    // of the receipt pre Byzantium
+    if (rev >= EVMC_SPURIOUS_DRAGON)
+        clear_empty_accounts(state);
 
     // Set accounts and their storage access status to cold in the end of transition process
     for (auto& acc : state.get_accounts())
