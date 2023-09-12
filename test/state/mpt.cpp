@@ -75,14 +75,13 @@ struct Path
 /// The MPT Node.
 ///
 /// The implementation is based on StackTrie from go-ethereum.
-// clang-tidy bug: https://github.com/llvm/llvm-project/issues/50006
+// clang-tidy-16 bug: https://github.com/llvm/llvm-project/issues/50006
 // NOLINTNEXTLINE(bugprone-reserved-identifier)
 class MPTNode
 {
     enum class Kind : uint8_t
     {
         leaf,
-        ext,
         branch
     };
 
@@ -97,24 +96,6 @@ class MPTNode
       : m_kind{kind}, m_path{path}, m_value{std::move(value)}
     {}
 
-    /// Creates an extended node.
-    static MPTNode ext(const Path& path, std::unique_ptr<MPTNode> child) noexcept
-    {
-        assert(child->m_kind == Kind::branch);
-        MPTNode node{Kind::ext, path};
-        node.m_children[0] = std::move(child);
-        return node;
-    }
-
-    /// Optionally wraps the child node with newly created extended node in case
-    /// the provided path is not empty.
-    static std::unique_ptr<MPTNode> optional_ext(
-        const Path& path, std::unique_ptr<MPTNode> child) noexcept
-    {
-        return (path.length != 0) ? std::make_unique<MPTNode>(ext(path, std::move(child))) :
-                                    std::move(child);
-    }
-
     /// Creates a branch node out of two children and optionally extends it with an extended
     /// node in case the path is not empty.
     static MPTNode ext_branch(const Path& path, size_t idx1, std::unique_ptr<MPTNode> child1,
@@ -125,11 +106,10 @@ class MPTNode
         assert(idx2 < num_children);
 
         MPTNode br{Kind::branch};
+        br.m_path = path;
         br.m_children[idx1] = std::move(child1);
         br.m_children[idx2] = std::move(child2);
-
-        return (path.length != 0) ? ext(path, std::make_unique<MPTNode>(std::move(br))) :
-                                    std::move(br);
+        return br;
     }
 
     /// Finds the position at witch two paths differ.
@@ -164,37 +144,50 @@ void MPTNode::insert(const Path& path, bytes&& value)  // NOLINT(misc-no-recursi
     {
     case Kind::branch:
     {
-        assert(m_path.length == 0);  // Branch has no path.
-
-        const auto idx = path.nibbles[0];
-        auto& child = m_children[idx];
-        if (!child)
-            child = leaf(path.tail(1), std::move(value));
+        if (m_path.length == 0)  // Branch has no path.
+        {
+            const auto idx = path.nibbles[0];
+            auto& child = m_children[idx];
+            if (!child)
+                child = leaf(path.tail(1), std::move(value));
+            else
+                child->insert(path.tail(1), std::move(value));
+        }
         else
-            child->insert(path.tail(1), std::move(value));
-        break;
-    }
+        {
+            const auto mismatch_pos = mismatch(m_path, path);
 
-    case Kind::ext:
-    {
-        assert(m_path.length != 0);  // Ext must have non-empty path.
+            if (mismatch_pos == m_path.length)  // Paths match: go into the child.
+            {
+                const auto sub_path = path.tail(mismatch_pos);
+                const auto idx = sub_path.nibbles[0];
+                auto& child = m_children[idx];
+                if (!child)
+                    child = leaf(sub_path.tail(1), std::move(value));
+                else
+                    child->insert(sub_path.tail(1), std::move(value));
+                return;
+            }
 
-        const auto mismatch_pos = mismatch(m_path, path);
+            const auto orig_idx = m_path.nibbles[mismatch_pos];
+            const auto new_idx = path.nibbles[mismatch_pos];
 
-        if (mismatch_pos == m_path.length)  // Paths match: go into the child.
-            return m_children[0]->insert(path.tail(mismatch_pos), std::move(value));
+            // The original branch node must be pushed down, possible extended with
+            // the adjusted extended node if the path split point is not directly at the branch
+            // node. Clang Analyzer bug: https://github.com/llvm/llvm-project/issues/47814
+            // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
 
-        const auto orig_idx = m_path.nibbles[mismatch_pos];
-        const auto new_idx = path.nibbles[mismatch_pos];
+            auto down_branch = std::make_unique<MPTNode>();
+            down_branch->m_kind = Kind::branch;
+            // optional_ext(m_path.tail(mismatch_pos + 1), *this);
+            down_branch->m_path = m_path.tail(mismatch_pos + 1);
+            for (size_t i = 0; i < num_children; ++i)
+                down_branch->m_children[i] = std::move(m_children[i]);
 
-        // The original branch node must be pushed down, possible extended with
-        // the adjusted extended node if the path split point is not directly at the branch node.
-        // Clang Analyzer bug: https://github.com/llvm/llvm-project/issues/47814
-        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
-        auto orig_branch = optional_ext(m_path.tail(mismatch_pos + 1), std::move(m_children[0]));
-        auto new_leaf = leaf(path.tail(mismatch_pos + 1), std::move(value));
-        *this = ext_branch(m_path.head(mismatch_pos), orig_idx, std::move(orig_branch), new_idx,
-            std::move(new_leaf));
+            auto new_leaf = leaf(path.tail(mismatch_pos + 1), std::move(value));
+            *this = ext_branch(m_path.head(mismatch_pos), orig_idx, std::move(down_branch), new_idx,
+                std::move(new_leaf));
+        }
         break;
     }
 
@@ -241,22 +234,29 @@ bytes MPTNode::encode() const  // NOLINT(misc-no-recursion)
     }
     case Kind::branch:
     {
-        assert(m_path.length == 0);
+        bytes branch;
         static constexpr uint8_t empty = 0x80;  // encoded empty child
 
         for (const auto& child : m_children)
         {
             if (child)
-                encoded += encode_child(*child);
+                branch += encode_child(*child);
             else
-                encoded += empty;
+                branch += empty;
         }
-        encoded += empty;  // end indicator
-        break;
-    }
-    case Kind::ext:
-    {
-        encoded = rlp::encode(m_path.encode(true)) + encode_child(*m_children[0]);
+        branch += empty;  // end indicator
+
+        if (m_path.length == 0)
+        {
+            encoded = branch;
+            break;
+        }
+
+        branch = rlp::internal::wrap_list(branch);
+        if (branch.size() >= 32)
+            branch = rlp::encode(keccak256(branch));
+
+        encoded = rlp::encode(m_path.encode(true)) + branch;
         break;
     }
     }
