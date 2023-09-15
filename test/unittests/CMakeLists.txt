@@ -7,6 +7,7 @@ add_executable(evmone-unittests)
 target_sources(
     evmone-unittests PRIVATE
     analysis_test.cpp
+    blockchaintest_loader_test.cpp
     bytecode_test.cpp
     eof_test.cpp
     eof_validation_test.cpp
@@ -56,17 +57,17 @@ target_sources(
     statetest_withdrawals_test.cpp
     tracing_test.cpp
 )
-target_link_libraries(evmone-unittests PRIVATE evmone evmone::evmmax evmone::state evmone::statetestutils testutils evmc::instructions GTest::gtest GTest::gtest_main)
+target_link_libraries(evmone-unittests PRIVATE evmone evmone::blockchaintestutils evmone::evmmax evmone::state evmone::statetestutils testutils evmc::instructions GTest::gtest GTest::gtest_main)
 target_include_directories(evmone-unittests PRIVATE ${evmone_private_include_dir})
 
 gtest_discover_tests(evmone-unittests TEST_PREFIX ${PROJECT_NAME}/unittests/)
 
 option(EVMONE_EVM_TEST_TOOL "Enable EVM unit testing tool for EVMC implementations (not maintained)" OFF)
-if(EVMONE_EVM_TEST_TOOL)
+if (EVMONE_EVM_TEST_TOOL)
     # The evm-test tool that contains the all evm-unittests and loads VMs as EVMC modules.
     add_executable(evm-test main.cpp)
     target_link_libraries(evm-test PRIVATE evm-unittests testutils evmc::evmc evmc::loader GTest::gtest)
-endif()
+endif ()
 
 # Provide the project version to selected source files.
 set_source_files_properties(

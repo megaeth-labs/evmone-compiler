@@ -191,6 +191,8 @@ state::BlockInfo from_json<state::BlockInfo>(const json::json& j)
             from_json<uint64_t>(j.at("parentGasLimit")),
             from_json<uint64_t>(j.at("parentBaseFee")));
     }
+    else if (const auto& it = j.find("baseFeePerGas"); it != j.end())
+        base_fee = from_json<uint64_t>(*it);
 
     std::vector<state::Withdrawal> withdrawals;
     if (const auto withdrawals_it = j.find("withdrawals"); withdrawals_it != j.end())
@@ -221,11 +223,33 @@ state::BlockInfo from_json<state::BlockInfo>(const json::json& j)
     if (parent_timestamp_it != j.end())
         parent_timestamp = from_json<int64_t>(*parent_timestamp_it);
 
-    return {from_json<int64_t>(j.at("currentNumber")), from_json<int64_t>(j.at("currentTimestamp")),
-        parent_timestamp, from_json<int64_t>(j.at("currentGasLimit")),
-        from_json<evmc::address>(j.at("currentCoinbase")), current_difficulty, parent_difficulty,
-        parent_uncle_hash, prev_randao, base_fee, std::move(ommers), std::move(withdrawals),
-        std::move(block_hashes)};
+    int64_t block_number = 0;
+    if (const auto it = j.find("number"); it != j.end())
+        block_number = from_json<int64_t>(*it);
+    else
+        block_number = from_json<int64_t>(j.at("currentNumber"));
+
+    int64_t timestamp = 0;
+    if (const auto it = j.find("timestamp"); it != j.end())
+        timestamp = from_json<int64_t>(*it);
+    else
+        timestamp = from_json<int64_t>(j.at("currentTimestamp"));
+
+    int64_t gas_limit = 0;
+    if (const auto it = j.find("gasLimit"); it != j.end())
+        gas_limit = from_json<int64_t>(*it);
+    else
+        gas_limit = from_json<int64_t>(j.at("currentGasLimit"));
+
+    evmc::address coinbase;
+    if (const auto it = j.find("coinbase"); it != j.end())
+        coinbase = from_json<evmc::address>(*it);
+    else
+        coinbase = from_json<evmc::address>(j.at("currentCoinbase"));
+
+    return {block_number, timestamp, parent_timestamp, gas_limit, coinbase, current_difficulty,
+        parent_difficulty, parent_uncle_hash, prev_randao, base_fee, std::move(ommers),
+        std::move(withdrawals), std::move(block_hashes)};
 }
 
 template <>
@@ -322,8 +346,17 @@ state::Transaction from_json<state::Transaction>(const json::json& j)
     from_json_tx_common(j, o);
     if (const auto chain_id_it = j.find("chainId"); chain_id_it != j.end())
         o.chain_id = from_json<uint8_t>(*chain_id_it);
-    o.data = from_json<bytes>(j.at("input"));
-    o.gas_limit = from_json<int64_t>(j.at("gas"));
+
+    if (const auto it = j.find("data"); it != j.end())
+        o.data = from_json<bytes>(*it);
+    else
+        o.data = from_json<bytes>(j.at("input"));
+
+    if (const auto it = j.find("gasLimit"); it != j.end())
+        o.gas_limit = from_json<int64_t>(*it);
+    else
+        o.gas_limit = from_json<int64_t>(j.at("gas"));
+
     o.value = from_json<intx::uint256>(j.at("value"));
 
     if (const auto ac_it = j.find("accessList"); ac_it != j.end())
