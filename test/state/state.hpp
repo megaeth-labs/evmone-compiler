@@ -172,6 +172,8 @@ struct TransactionReceipt
 
     /// Root hash of the state after this transaction. Used only in old pre-Byzantium transactions.
     std::optional<bytes32> post_state;
+
+    hash256 transaction_hash = {};
 };
 
 /// Finalize state after applying a "block" of transactions.
@@ -179,8 +181,8 @@ struct TransactionReceipt
 /// Applies block reward to coinbase, withdrawals (post Shanghai) and deletes empty touched accounts
 /// (post Spurious Dragon).
 void finalize(State& state, evmc_revision rev, const address& coinbase,
-    std::optional<uint64_t> block_reward, std::span<Ommer> ommers,
-    std::span<Withdrawal> withdrawals);
+    std::optional<uint64_t> block_reward, std::span<const Ommer> ommers,
+    std::span<const Withdrawal> withdrawals);
 
 [[nodiscard]] std::variant<TransactionReceipt, std::error_code> transition(State& state,
     const BlockInfo& block, const Transaction& tx, evmc_revision rev, evmc::VM& vm,

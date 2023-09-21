@@ -2,6 +2,7 @@
 // Copyright 2022 The evmone Authors.
 // SPDX-License-Identifier: Apache-2.0
 
+#include "blockchaintest.hpp"
 #include <CLI/CLI.hpp>
 #include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
@@ -23,10 +24,8 @@ public:
 
     void TestBody() final
     {
-        (void)m_json_test_file;
-        (void)m_vm;
-        //        std::ifstream f{m_json_test_file};
-        //        evmone::test::run_blockchain_test(evmone::test::load_blockchain_test(f), m_vm);
+        std::ifstream f{m_json_test_file};
+        evmone::test::run_blockchain_test(evmone::test::load_blockchain_test(f), m_vm);
     }
 };
 

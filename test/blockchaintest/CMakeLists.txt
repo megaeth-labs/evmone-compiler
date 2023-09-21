@@ -24,4 +24,5 @@ target_sources(
     blockchaintest.hpp
     blockchaintest.cpp
     blockchaintest_loader.cpp
+    blockchaintest_runner.cpp
 )

@@ -12,7 +12,7 @@ using namespace testing;
 
 TEST(json_loader, TestBlock)
 {
-    constexpr std::string_view input = R"({
+    std::istringstream input{R"({
         "000-fork=Shanghai-fill_stack": {
             "_info": {
                 "filling-transition-tool": "evm version 1.12.1-unstable-7c8719cd",
@@ -145,9 +145,9 @@ TEST(json_loader, TestBlock)
             },
             "sealEngine": "NoProof"
         }
-        })";
+        })"};
 
-    const auto btt = load_blockchain_test(json::json::parse(input));
+    const auto btt = load_blockchain_test(input);
 
     EXPECT_EQ(btt.cases.size(), 1);
     EXPECT_EQ(btt.cases[0].test_blocks.size(), 1);

@@ -8,13 +8,60 @@
 namespace evmone::test
 {
 
-TestBlock load_test_block(const json::json& j)
+namespace
+{
+template <typename T>
+T load_if_exists(const json::json& j, std::string_view key)
+{
+    if (const auto it = j.find(key); it != j.end())
+        return from_json<T>(*it);
+    return {};
+}
+}  // namespace
+
+template <>
+BlockHeader from_json<BlockHeader>(const json::json& j)
+{
+    return {from_json<hash256>(j.at("parentHash")), from_json<address>(j.at("coinbase")),
+        from_json<hash256>(j.at("stateRoot")), from_json<hash256>(j.at("receiptTrie")),
+        state::bloom_filter_from_bytes(from_json<bytes>(j.at("bloom"))),
+        load_if_exists<int64_t>(j, "difficulty"), load_if_exists<bytes32>(j, "mixHash"),
+        from_json<int64_t>(j.at("number")), from_json<int64_t>(j.at("gasLimit")),
+        from_json<int64_t>(j.at("gasUsed")), from_json<int64_t>(j.at("timestamp")),
+        from_json<bytes>(j.at("extraData")), load_if_exists<uint64_t>(j, "baseFeePerGas"),
+        from_json<hash256>(j.at("hash")), from_json<hash256>(j.at("transactionsTrie")),
+        load_if_exists<hash256>(j, "withdrawalsRoot")};
+}
+
+TestBlock load_test_block(const json::json& j, evmc_revision rev)
 {
     using namespace state;
     TestBlock tb;
 
-    if (auto it = j.find("blockHeader"); it != j.end())
+    if (const auto it = j.find("blockHeader"); it != j.end())
+    {
         tb.block_info = from_json<BlockInfo>(*it);
+        tb.expected_block_header = from_json<BlockHeader>(*it);
+        tb.block_info.number = tb.expected_block_header.block_number;
+        tb.block_info.timestamp = tb.expected_block_header.timestamp;
+        tb.block_info.gas_limit = tb.expected_block_header.gas_limit;
+        tb.block_info.coinbase = tb.expected_block_header.coinbase;
+        tb.block_info.difficulty = tb.expected_block_header.difficulty;
+        tb.block_info.prev_randao = tb.expected_block_header.prev_randao;
+        tb.block_info.base_fee = tb.expected_block_header.base_fee_per_gas;
+
+        // Override prev_randao with difficulty pre-Merge
+        if (rev < EVMC_PARIS)
+        {
+            tb.block_info.prev_randao =
+                intx::be::store<bytes32>(intx::uint256{tb.block_info.difficulty});
+        }
+    }
+    else
+    {
+        // TODO: Add support for invalid blocks.
+        throw std::runtime_error("Add support for invalid blocks.");
+    }
 
     if (auto it = j.find("withdrawals"); it != j.end())
     {
@@ -45,23 +92,28 @@ BlockchainTransitionTest::Case load_blockchain_test_case(
     c.rev = to_rev(j.at("network").get<std::string>());
 
     for (const auto& el : j.at("blocks"))
-        c.test_blocks.emplace_back(load_test_block(el));
+        c.test_blocks.emplace_back(load_test_block(el, c.rev));
 
     c.expectation.last_block_hash = from_json<hash256>(j.at("lastblockhash"));
-    c.expectation.post_state = from_json<State>(j.at("postState"));
+
+    if (const auto it = j.find("postState"); it != j.end())
+        c.expectation.post_state = from_json<State>(*it);
+    else if (const auto it_hash = j.find("postStateHash"); it_hash != j.end())
+        c.expectation.post_state = from_json<hash256>(*it_hash);
 
     return c;
 }
 }  // namespace
 
-BlockchainTransitionTest load_blockchain_test(const json::json& j)
+static void from_json(const json::json& j, BlockchainTransitionTest& o)
 {
-    BlockchainTransitionTest btt;
-
     for (auto elem_it : j.items())
-        btt.cases.emplace_back(load_blockchain_test_case(elem_it.key(), elem_it.value()));
+        o.cases.emplace_back(load_blockchain_test_case(elem_it.key(), elem_it.value()));
+}
 
-    return btt;
+BlockchainTransitionTest load_blockchain_test(std::istream& input)
+{
+    return json::json::parse(input).get<BlockchainTransitionTest>();
 }
 
 }  // namespace evmone::test

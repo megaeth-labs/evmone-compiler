@@ -136,8 +136,8 @@ std::variant<int64_t, std::error_code> validate_transaction(const Account& sende
 }
 
 void finalize(State& state, evmc_revision rev, const address& coinbase,
-    std::optional<uint64_t> block_reward, std::span<Ommer> ommers,
-    std::span<Withdrawal> withdrawals)
+    std::optional<uint64_t> block_reward, std::span<const Ommer> ommers,
+    std::span<const Withdrawal> withdrawals)
 {
     // TODO: The block reward can be represented as a withdrawal.
     if (block_reward.has_value())

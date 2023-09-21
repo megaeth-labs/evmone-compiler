@@ -24,7 +24,7 @@ add_subdirectory(statetest)
 add_subdirectory(t8n)
 add_subdirectory(unittests)
 
-set(targets evmone-bench evmone-bench-internal evmone-eofparse evmone-state evmone-statetest evmone-t8n evmone-unittests)
+set(targets evmone-bench evmone-bench-internal evmone-blockchaintest evmone-eofparse evmone-state evmone-statetest evmone-t8n evmone-unittests)
 
 if(EVMONE_FUZZING)
     add_subdirectory(eofparsefuzz)

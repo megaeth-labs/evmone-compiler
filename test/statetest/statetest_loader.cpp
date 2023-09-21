@@ -162,8 +162,11 @@ state::BlockInfo from_json<state::BlockInfo>(const json::json& j)
     int64_t parent_difficulty = 0;
     const auto prev_randao_it = j.find("currentRandom");
     const auto current_difficulty_it = j.find("currentDifficulty");
+    const auto difficulty_it = j.find("difficulty");
     const auto parent_difficulty_it = j.find("parentDifficulty");
 
+    if (difficulty_it != j.end())
+        current_difficulty = from_json<int64_t>(*difficulty_it);
     if (current_difficulty_it != j.end())
         current_difficulty = from_json<int64_t>(*current_difficulty_it);
     if (parent_difficulty_it != j.end())
