@@ -101,6 +101,7 @@ struct BlockInfo
     std::vector<Ommer> ommers = {};
     std::vector<Withdrawal> withdrawals;
     std::unordered_map<int64_t, hash256> known_block_hashes = {};
+    hash256 parent_beacon_block_root;
 };
 
 using AccessList = std::vector<std::pair<address, std::vector<bytes32>>>;

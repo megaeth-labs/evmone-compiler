@@ -252,7 +252,7 @@ state::BlockInfo from_json<state::BlockInfo>(const json::json& j)
 
     return {block_number, timestamp, parent_timestamp, gas_limit, coinbase, current_difficulty,
         parent_difficulty, parent_uncle_hash, prev_randao, base_fee, std::move(ommers),
-        std::move(withdrawals), std::move(block_hashes)};
+        std::move(withdrawals), std::move(block_hashes), {}};
 }
 
 template <>

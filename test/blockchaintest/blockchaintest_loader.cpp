@@ -30,7 +30,8 @@ BlockHeader from_json<BlockHeader>(const json::json& j)
         from_json<int64_t>(j.at("gasUsed")), from_json<int64_t>(j.at("timestamp")),
         from_json<bytes>(j.at("extraData")), load_if_exists<uint64_t>(j, "baseFeePerGas"),
         from_json<hash256>(j.at("hash")), from_json<hash256>(j.at("transactionsTrie")),
-        load_if_exists<hash256>(j, "withdrawalsRoot")};
+        load_if_exists<hash256>(j, "withdrawalsRoot"),
+        load_if_exists<hash256>(j, "parentBeaconBlockRoot")};
 }
 
 static TestBlock load_test_block(const json::json& j, evmc_revision rev)
@@ -49,6 +50,7 @@ static TestBlock load_test_block(const json::json& j, evmc_revision rev)
         tb.block_info.difficulty = tb.expected_block_header.difficulty;
         tb.block_info.prev_randao = tb.expected_block_header.prev_randao;
         tb.block_info.base_fee = tb.expected_block_header.base_fee_per_gas;
+        tb.block_info.parent_beacon_block_root = tb.expected_block_header.parent_beacon_block_root;
 
         // Override prev_randao with difficulty pre-Merge
         if (rev < EVMC_PARIS)
