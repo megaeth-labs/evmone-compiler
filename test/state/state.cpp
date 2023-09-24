@@ -146,6 +146,27 @@ void clear_empty_accounts(State& state)
 }
 }  // namespace
 
+void system_calls(State& state, const BlockInfo& block, evmc_revision rev, evmc::VM& vm)
+{
+    static constexpr auto SystemAddress = 0xfffffffffffffffffffffffffffffffffffffffe_address;
+    static constexpr auto BeaconRootsAddress = 0xbEac00dDB15f3B6d645C48263dC93862413A222D_address;
+
+    if (rev >= EVMC_CANCUN)
+    {
+        evmc_message msg{};
+        msg.kind = EVMC_CALL;
+        msg.sender = SystemAddress;
+        msg.recipient = BeaconRootsAddress;
+        msg.code_address = BeaconRootsAddress;
+        msg.gas = 30'000'000;
+        msg.input_data = block.parent_beacon_block_root.bytes;
+        msg.input_size = sizeof(block.parent_beacon_block_root);
+        Host host{rev, vm, state, block, {}};
+        [[maybe_unused]] const auto result = host.call(msg);
+        assert(result.status_code == EVMC_SUCCESS);
+    }
+}
+
 void finalize(State& state, evmc_revision rev, const address& coinbase,
     std::optional<uint64_t> block_reward, std::span<const Ommer> ommers,
     std::span<const Withdrawal> withdrawals)

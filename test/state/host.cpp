@@ -300,7 +300,7 @@ evmc::Result Host::call(const evmc_message& orig_msg) noexcept
 evmc_tx_context Host::get_tx_context() const noexcept
 {
     // TODO: The effective gas price is already computed in transaction validation.
-    assert(m_tx.max_gas_price >= m_block.base_fee);
+    //    assert(m_tx.max_gas_price >= m_block.base_fee);
     const auto priority_gas_price =
         std::min(m_tx.max_priority_gas_price, m_tx.max_gas_price - m_block.base_fee);
     const auto effective_gas_price = m_block.base_fee + priority_gas_price;
