@@ -200,56 +200,41 @@ void MPTNode::insert(const Path& path, bytes&& value)  // NOLINT(misc-no-recursi
     }
 }
 
-/// Encodes a node and optionally hashes the encoded bytes
-/// if their length exceeds the specified threshold.
-static bytes encode_child(const MPTNode& child) noexcept  // NOLINT(misc-no-recursion)
+static bytes shorten(bytes&& b)
 {
-    if (auto e = child.encode(); e.size() < 32)
-        return e;  // "short" node
-    else
-        return rlp::encode(keccak256(e));
+    if (b.size() < 32)
+        return std::move(b);
+    return rlp::encode(keccak256(b));
 }
 
 bytes MPTNode::encode() const  // NOLINT(misc-no-recursion)
 {
-    bytes encoded;
     switch (m_kind)
     {
     case Kind::leaf:
     {
-        encoded = rlp::encode(m_path.encode(false)) + rlp::encode(m_value);
-        break;
+        return rlp::encode_tuple(m_path.encode(false), m_value);
     }
     case Kind::branch:
     {
-        bytes branch;
         static constexpr uint8_t empty = 0x80;  // encoded empty child
 
+        bytes encoded;
         for (const auto& child : m_children)
         {
             if (child)
-                branch += encode_child(*child);
+                encoded += shorten(child->encode());
             else
-                branch += empty;
+                encoded += empty;
         }
-        branch += empty;  // end indicator
+        encoded += empty;  // end indicator
 
-        if (m_path.length == 0)
-        {
-            encoded = branch;
-            break;
-        }
-
-        branch = rlp::internal::wrap_list(branch);
-        if (branch.size() >= 32)
-            branch = rlp::encode(keccak256(branch));
-
-        encoded = rlp::encode(m_path.encode(true)) + branch;
-        break;
+        if (m_path.length != 0)  // Wrap with extended node.
+            encoded = rlp::encode(m_path.encode(true)) + shorten(rlp::internal::wrap_list(encoded));
+        return rlp::internal::wrap_list(encoded);
     }
     }
-
-    return rlp::internal::wrap_list(encoded);
+    return {};  // unreachable.
 }
 
 
