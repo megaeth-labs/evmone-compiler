@@ -140,12 +140,12 @@ address compute_new_account_address(const address& sender, uint64_t sender_nonce
 
 std::optional<evmc_message> Host::prepare_message(evmc_message msg)
 {
-    auto& sender_acc = m_state.get(msg.sender);
-    const auto sender_nonce = sender_acc.nonce;
-
     // Bump sender nonce.
     if (msg.depth == 0 || msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2)
     {
+        auto& sender_acc = m_state.get(msg.sender);
+        const auto sender_nonce = sender_acc.nonce;
+
         if (sender_nonce == Account::NonceMax)
             return {};  // Light early exception, cannot happen for depth == 0.
         ++sender_acc.nonce;
@@ -153,6 +153,9 @@ std::optional<evmc_message> Host::prepare_message(evmc_message msg)
 
     if (msg.kind == EVMC_CREATE || msg.kind == EVMC_CREATE2)
     {
+        auto& sender_acc = m_state.get(msg.sender);
+        const auto sender_nonce = sender_acc.nonce;
+
         // Compute and fill create address.
         assert(msg.recipient == address{});
         assert(msg.code_address == address{});
@@ -252,7 +255,7 @@ evmc::Result Host::execute_message(const evmc_message& msg) noexcept
     auto* const dst_acc =
         (msg.kind == EVMC_CALL) ? &m_state.touch(msg.recipient) : m_state.find(msg.code_address);
 
-    if (msg.kind == EVMC_CALL)
+    if (msg.kind == EVMC_CALL && !evmc::is_zero(msg.value))
     {
         // Transfer value.
         const auto value = intx::be::load<intx::uint256>(msg.value);
