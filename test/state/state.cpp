@@ -161,9 +161,21 @@ void system_calls(State& state, const BlockInfo& block, evmc_revision rev, evmc:
         msg.gas = 30'000'000;
         msg.input_data = block.parent_beacon_block_root.bytes;
         msg.input_size = sizeof(block.parent_beacon_block_root);
+        msg.depth = 1;  // Prevent nonce bump.
         Host host{rev, vm, state, block, {}};
         [[maybe_unused]] const auto result = host.call(msg);
         assert(result.status_code == EVMC_SUCCESS);
+
+        // Set accounts and their storage access status to cold in the end of transition process
+        for (auto& acc : state.get_accounts())
+        {
+            acc.second.access_status = EVMC_ACCESS_COLD;
+            for (auto& [_, val] : acc.second.storage)
+            {
+                val.access_status = EVMC_ACCESS_COLD;
+                val.original = val.current;
+            }
+        }
     }
 }
 
