@@ -105,8 +105,7 @@ class MPTNode
         assert(idx1 < num_children);
         assert(idx2 < num_children);
 
-        MPTNode br{Kind::branch};
-        br.m_path = path;
+        MPTNode br{Kind::branch, path};
         br.m_children[idx1] = std::move(child1);
         br.m_children[idx2] = std::move(child2);
         return br;
@@ -167,14 +166,12 @@ void MPTNode::insert(const Path& path, bytes&& value)  // NOLINT(misc-no-recursi
 
         auto new_leaf = leaf(path.tail(mismatch_pos + 1), std::move(value));
 
-        auto down_branch = std::make_unique<MPTNode>();
-        down_branch->m_kind = Kind::branch;
-        down_branch->m_path = m_path.tail(mismatch_pos + 1);
-        for (size_t i = 0; i < num_children; ++i)
-            down_branch->m_children[i] = std::move(m_children[i]);
+        const auto up_branch_path = m_path.head(mismatch_pos);
+        const auto down_branch_path = m_path.tail(mismatch_pos + 1);
+        m_path = down_branch_path;
 
-        *this = ext_branch(m_path.head(mismatch_pos), orig_idx, std::move(down_branch), insert_idx,
-            std::move(new_leaf));
+        *this = ext_branch(up_branch_path, orig_idx, std::make_unique<MPTNode>(std::move(*this)),
+            insert_idx, std::move(new_leaf));
         break;
     }
 
