@@ -4,8 +4,8 @@
 
 #include "mpt.hpp"
 #include "rlp.hpp"
-#include <algorithm>
 #include <cassert>
+#include <numeric>
 
 namespace evmone::state
 {
@@ -217,25 +217,21 @@ bytes MPTNode::encode() const  // NOLINT(misc-no-recursion)
     }
     case Kind::branch:
     {
-        static constexpr uint8_t empty = 0x80;  // encoded empty child
+        static constexpr uint8_t Empty = 0x80;  // encoded empty child
 
-        bytes encoded;
-        for (const auto& child : m_children)
-        {
-            if (child)
-                encoded += shorten(child->encode());
-            else
-                encoded += empty;
-        }
-        encoded += empty;  // end indicator
+        auto branch = rlp::internal::wrap_list(
+            std::accumulate(std::begin(m_children), std::end(m_children), bytes{},
+                [](const bytes& encoded, const auto& child) {
+                    return encoded + (child ? shorten(child->encode()) : bytes{Empty});
+                }) +
+            Empty /* child list end indicator */);
 
-        encoded = rlp::internal::wrap_list(encoded);
         if (m_path.length == 0)  // Pure branch node.
-            return encoded;
+            return branch;
 
         // Wrap with extended node.
         return rlp::internal::wrap_list(
-            rlp::encode(m_path.encode(true)) + shorten(std::move(encoded)));
+            rlp::encode(m_path.encode(true)) + shorten(std::move(branch)));
     }
     }
     return {};  // unreachable.
