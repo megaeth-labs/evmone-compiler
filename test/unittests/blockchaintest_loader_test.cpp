@@ -155,7 +155,7 @@ TEST(json_loader, TestBlock)
     EXPECT_EQ(btt.cases[0].name, "000-fork=Shanghai-fill_stack");
     EXPECT_EQ(btt.cases[0].genesis_block_header.timestamp, 0);
     EXPECT_EQ(btt.cases[0].genesis_block_header.gas_limit, 0x016345785d8a0000);
-    EXPECT_EQ(btt.cases[0].genesis_block_header.base_fee, 0x07);
+    EXPECT_EQ(btt.cases[0].genesis_block_header.base_fee_per_gas, 0x07);
 
     EXPECT_EQ(btt.cases[0].test_blocks[0].transactions[0].type, state::Transaction::Type::legacy);
     EXPECT_EQ(btt.cases[0].test_blocks[0].transactions[0].sender,

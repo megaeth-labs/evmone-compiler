@@ -87,7 +87,7 @@ BlockchainTransitionTest::Case load_blockchain_test_case(
 
     BlockchainTransitionTest::Case c;
     c.name = name;
-    c.genesis_block_header = from_json<BlockInfo>(j.at("genesisBlockHeader"));
+    c.genesis_block_header = from_json<BlockHeader>(j.at("genesisBlockHeader"));
     c.pre_state = from_json<State>(j.at("pre"));
     c.rev = to_rev(j.at("network").get<std::string>());
 

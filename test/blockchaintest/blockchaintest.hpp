@@ -58,7 +58,7 @@ struct BlockchainTransitionTest
             std::variant<state::State, hash256> post_state;
         };
 
-        state::BlockInfo genesis_block_header;
+        BlockHeader genesis_block_header;
         state::State pre_state;
         evmc_revision rev;
 

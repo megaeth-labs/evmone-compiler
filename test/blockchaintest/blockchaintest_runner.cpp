@@ -102,18 +102,25 @@ void run_blockchain_test(const BlockchainTransitionTest& test, evmc::VM& vm)
 
         auto state = c.pre_state;
 
-        //        apply_block(state, vm, c.genesis_block_header, {}, c.rev, 0);
-        //        EXPECT_EQ(
+        std::unordered_map<int64_t, hash256> known_block_hashes;
+        known_block_hashes[c.genesis_block_header.block_number] = c.genesis_block_header.hash;
+
+        //        apply_block(state, vm, c.genesis_block_header, {}, c.rev,
+        //        0); EXPECT_EQ(
         //            state::mpt_hash(state.get_accounts()),
         //            state::mpt_hash(c.pre_state.get_accounts()));
 
         for (const auto& test_block : c.test_blocks)
         {
-            const auto res = apply_block(state, vm, test_block.block_info, test_block.transactions,
+            auto bi = test_block.block_info;
+            bi.known_block_hashes = known_block_hashes;
+            const auto res = apply_block(state, vm, bi, test_block.transactions,
                 c.rev, mining_reward(c.rev));
 
-            SCOPED_TRACE(std::string{evmc::to_string(c.rev)} + '/' + std::to_string(case_index) + '/' + c.name + '/' +
-                         std::to_string(test_block.block_info.number));
+            known_block_hashes[test_block.expected_block_header.block_number] = test_block.expected_block_header.hash;
+
+            SCOPED_TRACE(std::string{evmc::to_string(c.rev)} + '/' + std::to_string(case_index) +
+                         '/' + c.name + '/' + std::to_string(test_block.block_info.number));
 
             EXPECT_EQ(
                 state::mpt_hash(state.get_accounts()), test_block.expected_block_header.state_root);
@@ -132,9 +139,10 @@ void run_blockchain_test(const BlockchainTransitionTest& test, evmc::VM& vm)
             // TODO: Add difficulty calculation verification.
         }
 
-        auto post_state_hash = std::holds_alternative<state::State>(c.expectation.post_state) ?
-                state::mpt_hash(std::get<state::State>(c.expectation.post_state).get_accounts())
-                                   : std::get<hash256>(c.expectation.post_state);
+        auto post_state_hash =
+            std::holds_alternative<state::State>(c.expectation.post_state) ?
+                state::mpt_hash(std::get<state::State>(c.expectation.post_state).get_accounts()) :
+                std::get<hash256>(c.expectation.post_state);
         EXPECT_EQ(state::mpt_hash(state.get_accounts()), post_state_hash);
     }
 }
