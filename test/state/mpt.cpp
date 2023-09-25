@@ -229,9 +229,13 @@ bytes MPTNode::encode() const  // NOLINT(misc-no-recursion)
         }
         encoded += empty;  // end indicator
 
-        if (m_path.length != 0)  // Wrap with extended node.
-            encoded = rlp::encode(m_path.encode(true)) + shorten(rlp::internal::wrap_list(encoded));
-        return rlp::internal::wrap_list(encoded);
+        encoded = rlp::internal::wrap_list(encoded);
+        if (m_path.length == 0)  // Pure branch node.
+            return encoded;
+
+        // Wrap with extended node.
+        return rlp::internal::wrap_list(
+            rlp::encode(m_path.encode(true)) + shorten(std::move(encoded)));
     }
     }
     return {};  // unreachable.
