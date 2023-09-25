@@ -146,35 +146,34 @@ void MPTNode::insert(const Path& path, bytes&& value)  // NOLINT(misc-no-recursi
     {
         const auto mismatch_pos = mismatch(m_path, path);
 
+        const auto insert_idx = path.nibbles[mismatch_pos];
+
         if (mismatch_pos == m_path.length)  // Paths match: go into the child.
         {
-            const auto sub_path = path.tail(mismatch_pos);
-            const auto idx = sub_path.nibbles[0];
-            auto& child = m_children[idx];
+            auto& child = m_children[insert_idx];
             if (!child)
-                child = leaf(sub_path.tail(1), std::move(value));
+                child = leaf(path.tail(mismatch_pos + 1), std::move(value));
             else
-                child->insert(sub_path.tail(1), std::move(value));
+                child->insert(path.tail(mismatch_pos + 1), std::move(value));
             return;
         }
 
         const auto orig_idx = m_path.nibbles[mismatch_pos];
-        const auto new_idx = path.nibbles[mismatch_pos];
 
         // The original branch node must be pushed down, possible extended with
         // the adjusted extended node if the path split point is not directly at the branch
         // node. Clang Analyzer bug: https://github.com/llvm/llvm-project/issues/47814
         // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
 
+        auto new_leaf = leaf(path.tail(mismatch_pos + 1), std::move(value));
+
         auto down_branch = std::make_unique<MPTNode>();
         down_branch->m_kind = Kind::branch;
-        // optional_ext(m_path.tail(mismatch_pos + 1), *this);
         down_branch->m_path = m_path.tail(mismatch_pos + 1);
         for (size_t i = 0; i < num_children; ++i)
             down_branch->m_children[i] = std::move(m_children[i]);
 
-        auto new_leaf = leaf(path.tail(mismatch_pos + 1), std::move(value));
-        *this = ext_branch(m_path.head(mismatch_pos), orig_idx, std::move(down_branch), new_idx,
+        *this = ext_branch(m_path.head(mismatch_pos), orig_idx, std::move(down_branch), insert_idx,
             std::move(new_leaf));
         break;
     }
