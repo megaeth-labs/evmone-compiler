@@ -33,7 +33,7 @@ BlockHeader from_json<BlockHeader>(const json::json& j)
         load_if_exists<hash256>(j, "withdrawalsRoot")};
 }
 
-TestBlock load_test_block(const json::json& j, evmc_revision rev)
+static TestBlock load_test_block(const json::json& j, evmc_revision rev)
 {
     using namespace state;
     TestBlock tb;

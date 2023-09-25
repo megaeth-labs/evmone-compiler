@@ -26,8 +26,8 @@ struct TransitionResult
     int64_t gas_used;
 };
 
-TransitionResult apply_block(state::State& state, evmc::VM& vm, const state::BlockInfo& block,
-    const std::vector<state::Transaction>& txs, evmc_revision rev,
+static TransitionResult apply_block(state::State& state, evmc::VM& vm,
+    const state::BlockInfo& block, const std::vector<state::Transaction>& txs, evmc_revision rev,
     std::optional<int64_t> block_reward)
 {
     std::vector<state::Log> txs_logs;
@@ -80,7 +80,7 @@ TransitionResult apply_block(state::State& state, evmc::VM& vm, const state::Blo
     return {receipts, rejected_txs, cumulative_gas_used};
 }
 
-std::optional<int64_t> mining_reward(evmc_revision rev)
+static std::optional<int64_t> mining_reward(evmc_revision rev)
 {
     if (rev < EVMC_BYZANTIUM)
         return 5000000000000000000;
@@ -92,7 +92,7 @@ std::optional<int64_t> mining_reward(evmc_revision rev)
         return {};
 }
 
-std::string print_state(const state::State& s)
+static std::string print_state(const state::State& s)
 {
     std::stringstream out;
     const std::map<address, state::Account> ordered(
@@ -120,10 +120,10 @@ std::string print_state(const state::State& s)
     return out.str();
 }
 
-std::string compare_states(const state::State& l, const state::State& r)
-{
-    return print_state(l) + "\n\n" + print_state(r);
-}
+// static std::string compare_states(const state::State& l, const state::State& r)
+//{
+//     return print_state(l) + "\n\n" + print_state(r);
+// }
 
 void run_blockchain_test(const BlockchainTransitionTest& test, evmc::VM& vm)
 {
