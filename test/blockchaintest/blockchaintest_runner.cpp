@@ -92,6 +92,39 @@ std::optional<int64_t> mining_reward(evmc_revision rev)
         return {};
 }
 
+std::string print_state(const state::State& s)
+{
+    std::stringstream out;
+    const std::map<address, state::Account> ordered(
+        s.get_accounts().begin(), s.get_accounts().end());
+
+    for (const auto& [key, acc] : ordered)
+    {
+        out << key << " : \n";
+        out << "\tnonce : " << acc.nonce << "\n";
+        out << "\tbalance : " << hex0x(acc.balance) << "\n";
+        out << "\tcode : " << hex0x(acc.code) << "\n";
+
+        if (!acc.storage.empty())
+        {
+            const std::map<bytes32, state::StorageValue> ordered_storage(
+                acc.storage.begin(), acc.storage.end());
+
+            out << "\tstorage : "
+                << "\n";
+            for (const auto& [s_key, val] : ordered_storage)
+                out << "\t\t" << s_key << " : " << hex0x(val.current) << "\n";
+        }
+    }
+
+    return out.str();
+}
+
+std::string compare_states(const state::State& l, const state::State& r)
+{
+    return print_state(l) + "\n\n" + print_state(r);
+}
+
 void run_blockchain_test(const BlockchainTransitionTest& test, evmc::VM& vm)
 {
     for (size_t case_index = 0; case_index != test.cases.size(); ++case_index)
@@ -114,16 +147,18 @@ void run_blockchain_test(const BlockchainTransitionTest& test, evmc::VM& vm)
         {
             auto bi = test_block.block_info;
             bi.known_block_hashes = known_block_hashes;
-            const auto res = apply_block(state, vm, bi, test_block.transactions,
-                c.rev, mining_reward(c.rev));
+            const auto res =
+                apply_block(state, vm, bi, test_block.transactions, c.rev, mining_reward(c.rev));
 
-            known_block_hashes[test_block.expected_block_header.block_number] = test_block.expected_block_header.hash;
+            known_block_hashes[test_block.expected_block_header.block_number] =
+                test_block.expected_block_header.hash;
 
             SCOPED_TRACE(std::string{evmc::to_string(c.rev)} + '/' + std::to_string(case_index) +
                          '/' + c.name + '/' + std::to_string(test_block.block_info.number));
 
             EXPECT_EQ(
                 state::mpt_hash(state.get_accounts()), test_block.expected_block_header.state_root);
+
             if (c.rev >= EVMC_SHANGHAI)
             {
                 EXPECT_EQ(state::mpt_hash(test_block.block_info.withdrawals),
@@ -143,7 +178,12 @@ void run_blockchain_test(const BlockchainTransitionTest& test, evmc::VM& vm)
             std::holds_alternative<state::State>(c.expectation.post_state) ?
                 state::mpt_hash(std::get<state::State>(c.expectation.post_state).get_accounts()) :
                 std::get<hash256>(c.expectation.post_state);
-        EXPECT_EQ(state::mpt_hash(state.get_accounts()), post_state_hash);
+        EXPECT_TRUE(state::mpt_hash(state.get_accounts()) == post_state_hash)
+            << "Result state:\n"
+            << print_state(state)
+            << (std::holds_alternative<state::State>(c.expectation.post_state) ?
+                       "\n\nExpected state:\n" + print_state(std::get<state::State>(c.expectation.post_state)) :
+                       "");
     }
 }
 }  // namespace evmone::test
