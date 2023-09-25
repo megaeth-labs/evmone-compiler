@@ -200,15 +200,13 @@ void MPTNode::insert(const Path& path, bytes&& value)  // NOLINT(misc-no-recursi
     }
 }
 
-static bytes shorten(bytes&& b)
-{
-    if (b.size() < 32)
-        return std::move(b);
-    return rlp::encode(keccak256(b));
-}
 
 bytes MPTNode::encode() const  // NOLINT(misc-no-recursion)
 {
+    static constexpr auto shorten = [](bytes&& b) {
+        return (b.size() < 32) ? std::move(b) : rlp::encode(keccak256(b));
+    };
+
     switch (m_kind)
     {
     case Kind::leaf:
