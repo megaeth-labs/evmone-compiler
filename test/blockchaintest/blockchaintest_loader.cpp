@@ -63,6 +63,18 @@ TestBlock load_test_block(const json::json& j, evmc_revision rev)
         throw std::runtime_error("Add support for invalid blocks.");
     }
 
+    if (const auto it = j.find("uncleHeaders"); it != j.end())
+    {
+        auto current_block_number = tb.block_info.number;
+        for (const auto& ommer : *it)
+        {
+            tb.block_info.ommers.push_back({from_json<address>(ommer.at("coinbase")),
+                static_cast<uint32_t>(
+                    current_block_number - from_json<int64_t>(ommer.at("number")))});
+        }
+    }
+
+
     if (auto it = j.find("withdrawals"); it != j.end())
     {
         for (const auto& withdrawal : *it)
