@@ -153,6 +153,9 @@ void system_call(State& state, const BlockInfo& block, evmc_revision rev, evmc::
 
     if (rev >= EVMC_CANCUN)
     {
+        // TODO: Check if the system account should be touched.
+        // state.touch(SystemAddress);
+
         if (const auto acc = state.find(BeaconRootsAddress); acc != nullptr)
         {
             const evmc_message msg{
