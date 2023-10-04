@@ -37,7 +37,8 @@ void state_transition::TearDown()
     if (trace)
         trace_capture.emplace();
 
-    const auto res = evmone::state::transition(state, block, tx, rev, selected_vm, block.gas_limit);
+    const auto res = evmone::state::transition(
+        state, block, tx, rev, selected_vm, block.gas_limit, state::BlockInfo::MaxBlobGasPerBlock);
 
     if (const auto expected_error = make_error_code(expect.tx_error))
     {
