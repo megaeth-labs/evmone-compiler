@@ -14,6 +14,8 @@ namespace evmone::state
 {
 namespace
 {
+constexpr auto GAS_PER_BLOB = 0x20000;
+
 inline constexpr int64_t num_words(size_t size_in_bytes) noexcept
 {
     return static_cast<int64_t>((size_in_bytes + 31) / 32);
@@ -38,6 +40,20 @@ int64_t compute_access_list_cost(const AccessList& access_list) noexcept
     for (const auto& a : access_list)
         cost += address_cost + static_cast<int64_t>(a.second.size()) * storage_key_cost;
     return cost;
+}
+
+int64_t fake_exponential(int64_t factor, int64_t numerator, int64_t denominator)
+{
+    int64_t i = 1;
+    int64_t output = 0;
+    auto numerator_accum = factor * denominator;
+    while (numerator_accum > 0)
+    {
+        output += numerator_accum;
+        numerator_accum = (numerator_accum * numerator) / (denominator * i);
+        i += 1;
+    }
+    return output / denominator;
 }
 
 int64_t compute_tx_intrinsic_cost(evmc_revision rev, const Transaction& tx) noexcept
@@ -75,11 +91,32 @@ evmc_message build_message(const Transaction& tx, int64_t execution_gas_limit) n
 /// Validates transaction and computes its execution gas limit (the amount of gas provided to EVM).
 /// @return  Execution gas limit or transaction validation error.
 std::variant<int64_t, std::error_code> validate_transaction(const Account& sender_acc,
-    const BlockInfo& block, const Transaction& tx, evmc_revision rev,
-    int64_t block_gas_left) noexcept
+    const BlockInfo& block, const Transaction& tx, evmc_revision rev, int64_t block_gas_left,
+    int64_t blob_gas_left) noexcept
 {
+    const auto blob_gas_price = fake_exponential(1, block.excess_blob_gas, 3338477);
+
     switch (tx.type)
     {
+    case Transaction::Type::blob:
+        if (rev < EVMC_CANCUN)
+            return make_error_code(TX_TYPE_NOT_SUPPORTED);
+        if (!tx.to.has_value())
+            return make_error_code(CREATE_BLOB_TX);
+        if (tx.blob_hashes.empty())
+            return make_error_code(EMPTY_BLOB_HASHES_LIST);
+        if (tx.blob_hashes.size() > 6)
+            return make_error_code(BLOB_HASHES_LIST_SIZE_LIMIT_EXCEEDED);
+
+        if (tx.max_blob_gas_price < blob_gas_price)
+            return make_error_code(FEE_CAP_LESS_THEN_BLOCKS);
+
+        if (std::ranges::any_of(tx.blob_hashes, [](const auto& h) { return h.bytes[0] != 0x01; }))
+            return make_error_code(INVALID_BLOB_HASH_VERSION);
+        if (std::cmp_greater(GAS_PER_BLOB * tx.blob_hashes.size(), blob_gas_left))
+            return make_error_code(BLOB_GAS_LIMIT_EXCEEDED);
+        [[fallthrough]];
+
     case Transaction::Type::eip1559:
         if (rev < EVMC_LONDON)
             return make_error_code(TX_TYPE_NOT_SUPPORTED);
@@ -123,9 +160,16 @@ std::variant<int64_t, std::error_code> validate_transaction(const Account& sende
     // Compute and check if sender has enough balance for the theoretical maximum transaction cost.
     // Note this is different from tx_max_cost computed with effective gas price later.
     // The computation cannot overflow if done with 512-bit precision.
-    if (const auto tx_cost_limit_512 =
-            umul(intx::uint256{tx.gas_limit}, tx.max_gas_price) + tx.value;
-        sender_acc.balance < tx_cost_limit_512)
+    auto max_total_fee = umul(intx::uint256{tx.gas_limit}, tx.max_gas_price);
+    max_total_fee += tx.value;
+
+    if (tx.type == Transaction::Type::blob)
+    {
+        const auto total_blob_gas = GAS_PER_BLOB * tx.blob_hashes.size();
+        // FIXME: Can overflow uint256.
+        max_total_fee += total_blob_gas * tx.max_blob_gas_price;
+    }
+    if (sender_acc.balance < max_total_fee)
         return make_error_code(INSUFFICIENT_FUNDS);
 
     const auto execution_gas_limit = tx.gas_limit - compute_tx_intrinsic_cost(rev, tx);
@@ -176,15 +220,17 @@ void finalize(State& state, evmc_revision rev, const address& coinbase,
 }
 
 std::variant<TransactionReceipt, std::error_code> transition(State& state, const BlockInfo& block,
-    const Transaction& tx, evmc_revision rev, evmc::VM& vm, int64_t block_gas_left)
+    const Transaction& tx, evmc_revision rev, evmc::VM& vm, int64_t block_gas_left,
+    int64_t blob_gas_left)
 {
     auto* sender_ptr = state.find(tx.sender);
 
     // Validate transaction. The validation needs the sender account, so in case
     // it doesn't exist provide an empty one. The account isn't created in the state
     // to prevent the state modification in case the transaction is invalid.
-    const auto validation_result = validate_transaction(
-        (sender_ptr != nullptr) ? *sender_ptr : Account{}, block, tx, rev, block_gas_left);
+    const auto validation_result =
+        validate_transaction((sender_ptr != nullptr) ? *sender_ptr : Account{}, block, tx, rev,
+            block_gas_left, blob_gas_left);
 
     if (holds_alternative<std::error_code>(validation_result))
         return get<std::error_code>(validation_result);
@@ -206,6 +252,17 @@ std::variant<TransactionReceipt, std::error_code> transition(State& state, const
     const auto tx_max_cost = tx.gas_limit * effective_gas_price;
 
     sender_acc.balance -= tx_max_cost;  // Modify sender balance after all checks.
+
+    int64_t blob_gas_used = 0;
+    if (tx.type == Transaction::Type::blob)
+    {
+        const auto blob_gas_price = fake_exponential(1, block.excess_blob_gas, 3338477);
+        blob_gas_used = GAS_PER_BLOB * static_cast<int64_t>(tx.blob_hashes.size());
+        const auto blob_fee = blob_gas_used * blob_gas_price;
+
+        assert(sender_acc.balance >= blob_fee);  // Checked at the front.
+        sender_acc.balance -= blob_fee;
+    }
 
     Host host{rev, vm, state, block, tx};
 
@@ -243,7 +300,8 @@ std::variant<TransactionReceipt, std::error_code> transition(State& state, const
         [](const std::pair<const address, Account>& p) noexcept { return p.second.destructed; });
 
     // Cumulative gas used is unknown in this scope.
-    TransactionReceipt receipt{tx.type, result.status_code, gas_used, {}, host.take_logs(), {}, {}};
+    TransactionReceipt receipt{
+        tx.type, result.status_code, gas_used, blob_gas_used, {}, host.take_logs(), {}, {}};
 
     // Cannot put it into constructor call because logs are std::moved from host instance.
     receipt.logs_bloom_filter = compute_bloom_filter(receipt.logs);
@@ -276,6 +334,7 @@ std::variant<TransactionReceipt, std::error_code> transition(State& state, const
 
 [[nodiscard]] bytes rlp_encode(const Transaction& tx)
 {
+    // TODO: Refactor this function. For all type of transactions most of the code is similar.
     if (tx.type == Transaction::Type::legacy)
     {
         // rlp [nonce, gas_price, gas_limit, to, value, data, v, r, s];
@@ -294,7 +353,7 @@ std::variant<TransactionReceipt, std::error_code> transition(State& state, const
                    tx.to.has_value() ? tx.to.value() : bytes_view(), tx.value, tx.data,
                    tx.access_list, static_cast<bool>(tx.v), tx.r, tx.s);
     }
-    else
+    else if (tx.type == Transaction::Type::eip1559)
     {
         if (tx.v > 1)
             throw std::invalid_argument("`v` value for eip1559 transaction must be 0 or 1");
@@ -306,6 +365,21 @@ std::variant<TransactionReceipt, std::error_code> transition(State& state, const
                    static_cast<uint64_t>(tx.gas_limit),
                    tx.to.has_value() ? tx.to.value() : bytes_view(), tx.value, tx.data,
                    tx.access_list, static_cast<bool>(tx.v), tx.r, tx.s);
+    }
+    else
+    {
+        if (tx.v > 1)
+            throw std::invalid_argument("`v` value for blob transaction must be 0 or 1");
+        if (!tx.to.has_value())  // Blob tx has to have `to` address
+            throw std::invalid_argument("`to` value for blob transaction must not be null");
+        // tx_type +
+        // rlp [chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
+        // data, access_list, max_fee_per_blob_gas, blob_versioned_hashes, sig_parity, r, s];
+        return bytes{stdx::to_underlying(Transaction::Type::blob)} +
+               rlp::encode_tuple(tx.chain_id, tx.nonce, tx.max_priority_gas_price, tx.max_gas_price,
+                   static_cast<uint64_t>(tx.gas_limit), tx.to.value(), tx.value, tx.data,
+                   tx.access_list, tx.max_blob_gas_price, tx.blob_hashes, static_cast<bool>(tx.v),
+                   tx.r, tx.s);
     }
 }
 

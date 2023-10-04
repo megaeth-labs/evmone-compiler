@@ -99,6 +99,13 @@ struct BlockInfo
     bytes32 prev_randao;
     uint64_t base_fee = 0;
     std::vector<Ommer> ommers = {};
+
+    /// The "excess blob gas" parameter from EIP-4844
+    /// for computing the blob gas price in the current block.
+    int64_t excess_blob_gas = 0;
+    /// Max amount of blob gas allowed in block. It's static now but can be dynamic in the future.
+    static constexpr int64_t MaxBlobGasPerBlock = 786432;
+
     std::vector<Withdrawal> withdrawals;
     std::unordered_map<int64_t, hash256> known_block_hashes = {};
 };
@@ -123,6 +130,10 @@ struct Transaction
         /// The typed transaction with priority gas price.
         /// Introduced by EIP-1559 https://eips.ethereum.org/EIPS/eip-1559.
         eip1559 = 2,
+
+        /// The typed blob transaction (with array of blob hashes).
+        /// Introduced by EIP-4844 https://eips.ethereum.org/EIPS/eip-4844.
+        blob = 3,
     };
 
     Type type = Type::legacy;
@@ -130,10 +141,12 @@ struct Transaction
     int64_t gas_limit;
     intx::uint256 max_gas_price;
     intx::uint256 max_priority_gas_price;
+    intx::uint256 max_blob_gas_price = {};
     address sender;
     std::optional<address> to;
     intx::uint256 value;
     AccessList access_list;
+    std::vector<bytes32> blob_hashes = {};
     uint64_t chain_id = 0;
     uint64_t nonce = 0;
     intx::uint256 r;
@@ -165,6 +178,9 @@ struct TransactionReceipt
     /// Amount of gas used by this transaction.
     int64_t gas_used = 0;
 
+    /// Amount of blob gas used by this transaction.
+    int64_t blob_gas_used = 0;
+
     /// Amount of gas used by this and previous transactions in the block.
     int64_t cumulative_gas_used = 0;
     std::vector<Log> logs;
@@ -184,11 +200,11 @@ void finalize(State& state, evmc_revision rev, const address& coinbase,
 
 [[nodiscard]] std::variant<TransactionReceipt, std::error_code> transition(State& state,
     const BlockInfo& block, const Transaction& tx, evmc_revision rev, evmc::VM& vm,
-    int64_t block_gas_left);
+    int64_t block_gas_left, int64_t blob_gas_left);
 
 std::variant<int64_t, std::error_code> validate_transaction(const Account& sender_acc,
-    const BlockInfo& block, const Transaction& tx, evmc_revision rev,
-    int64_t block_gas_left) noexcept;
+    const BlockInfo& block, const Transaction& tx, evmc_revision rev, int64_t block_gas_left,
+    int64_t blob_gas_left) noexcept;
 
 /// Defines how to RLP-encode a Transaction.
 [[nodiscard]] bytes rlp_encode(const Transaction& tx);

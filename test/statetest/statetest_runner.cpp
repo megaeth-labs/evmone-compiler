@@ -27,8 +27,8 @@ void run_state_test(const StateTransitionTest& test, evmc::VM& vm, bool trace_su
 
             validate_deployed_code(state, rev);
 
-            const auto res =
-                state::transition(state, test.block, tx, rev, vm, test.block.gas_limit);
+            const auto res = state::transition(state, test.block, tx, rev, vm, test.block.gas_limit,
+                state::BlockInfo::MaxBlobGasPerBlock);
 
             // Finalize block with reward 0.
             state::finalize(state, rev, test.block.coinbase, 0, {}, {});

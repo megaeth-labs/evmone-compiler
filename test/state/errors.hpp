@@ -23,6 +23,11 @@ enum ErrorCode : int
     GAS_LIMIT_REACHED,
     SENDER_NOT_EOA,
     INIT_CODE_SIZE_LIMIT_EXCEEDED,
+    CREATE_BLOB_TX,
+    EMPTY_BLOB_HASHES_LIST,
+    BLOB_HASHES_LIST_SIZE_LIMIT_EXCEEDED,
+    INVALID_BLOB_HASH_VERSION,
+    BLOB_GAS_LIMIT_EXCEEDED,
     UNKNOWN_ERROR,
 };
 
@@ -40,7 +45,7 @@ inline const std::error_category& evmone_category() noexcept
             case SUCCESS:
                 return "";
             case INTRINSIC_GAS_TOO_LOW:
-                return "intrinsic gas too low:";
+                return "intrinsic gas too low";
             case TX_TYPE_NOT_SUPPORTED:
                 return "transaction type not supported";
             case INSUFFICIENT_FUNDS:
@@ -61,6 +66,16 @@ inline const std::error_category& evmone_category() noexcept
                 return "sender not an eoa:";
             case INIT_CODE_SIZE_LIMIT_EXCEEDED:
                 return "max initcode size exceeded";
+            case CREATE_BLOB_TX:
+                return "blob transaction must not be a create transaction";
+            case EMPTY_BLOB_HASHES_LIST:
+                return "empty blob hashes list";
+            case BLOB_HASHES_LIST_SIZE_LIMIT_EXCEEDED:
+                return "blob hashes list size limit exceeded";
+            case INVALID_BLOB_HASH_VERSION:
+                return "invalid blob hash version";
+            case BLOB_GAS_LIMIT_EXCEEDED:
+                return "blob gas limit exceeded";
             case UNKNOWN_ERROR:
                 return "Unknown error";
             default:
