@@ -354,11 +354,11 @@ TEST_P(evm, eof_create3)
 
     const auto init_code =
         calldatacopy(0, 0, OP_CALLDATASIZE) + OP_CALLDATASIZE + 0 + OP_RETURNCONTRACT + Opcode{0};
-    const auto init_container = eof1_bytecode(init_code, 3, {}, deploy_container);
+    const auto init_container = eof1_bytecode(init_code, 3, {}, 0, deploy_container);
 
     const auto create_code = calldatacopy(0, 0, OP_CALLDATASIZE) +
                              create3().input(0, OP_CALLDATASIZE).salt(0xff) + ret_top();
-    const auto container = eof1_bytecode(create_code, 4, {}, init_container);
+    const auto container = eof1_bytecode(create_code, 4, {}, 0, init_container);
 
     // test executing create code mocking CREATE3 call
     host.call_result.output_data = deploy_container.data();

@@ -39,6 +39,7 @@ struct EOF1Header
     std::vector<uint16_t> code_offsets;
 
     uint16_t data_size = 0;
+    uint16_t data_offset = 0;
     /// Size of every container section.
     std::vector<uint16_t> container_sizes;
     /// Offset of every container section start;
@@ -70,8 +71,8 @@ struct EOF1Header
         return container.substr(container_offsets[container_idx], container_sizes[container_idx]);
     }
 
-    /// Offset of the data section size value in the header.
-    [[nodiscard]] size_t data_size_position() const noexcept;
+    /// Offset of the data section body.
+    //    [[nodiscard]] size_t data_body_position() const noexcept;
 };
 
 /// Checks if code starts with EOF FORMAT + MAGIC, doesn't validate the format.

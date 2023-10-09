@@ -120,14 +120,13 @@ inline bytecode eof1_header(uint16_t code_size, uint16_t max_stack_height, uint1
 }
 
 inline bytecode eof1_bytecode(bytecode code, uint16_t max_stack_height = 0, bytecode data = {},
-    bytecode embedded_container = {})
+    uint16_t data_size = 0, bytecode embedded_container = {})
 {
     assert(code.size() <= std::numeric_limits<uint16_t>::max());
     assert(data.size() <= std::numeric_limits<uint16_t>::max());
     assert(embedded_container.size() <= std::numeric_limits<uint16_t>::max());
 
     const auto code_size = static_cast<uint16_t>(code.size());
-    const auto data_size = static_cast<uint16_t>(data.size());
 
     if (!embedded_container.empty())
     {
@@ -140,7 +139,7 @@ inline bytecode eof1_bytecode(bytecode code, uint16_t max_stack_height = 0, byte
 }
 
 inline bytecode eof1_bytecode(bytecode code, uint16_t max_stack_height, bytecode data,
-    std::span<const bytecode> embedded_containers)
+    uint16_t data_size, std::span<const bytecode> embedded_containers)
 {
     assert(code.size() <= std::numeric_limits<uint16_t>::max());
     assert(data.size() <= std::numeric_limits<uint16_t>::max());
@@ -151,7 +150,7 @@ inline bytecode eof1_bytecode(bytecode code, uint16_t max_stack_height, bytecode
         [](const auto& container) { return static_cast<uint16_t>(container.size()); });
 
     bytecode container = eof1_header(static_cast<uint16_t>(code.size()), max_stack_height,
-                             static_cast<uint16_t>(data.size()), embedded_container_sizes) +
+                             data_size, embedded_container_sizes) +
                          code;
     for (const auto& embedded_container : embedded_containers)
         container += embedded_container;
