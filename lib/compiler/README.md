@@ -84,7 +84,7 @@ The following two tables compares the performance of various versions of the pro
 |             Fib(10^8) | Time (ms) | Slowdown (vs. C) | Speedup (vs. interpreter) |
 |----------------------:|----------:|-----------------:|--------------------------:|
 |    evmone interpreter |      4230 |          141.00x |                     1.00x |
-|       evmone compiler |       403 |           13.33x |                    10.50x |
+|   **evmone compiler** |   **403** |       **13.33x** |                **10.50x** |
 | Manual loop inversion |       134 |            4.44x |                    31.57x |
 |       Elide gas check |        43 |            1.37x |                    98.37x |
 |              Native C |        30 |            1.00x |                   141.00x |
@@ -93,13 +93,13 @@ The following two tables compares the performance of various versions of the pro
 |             Fib(10^8) | Time (ms) | Slowdown (vs. C) | Speedup (vs. interpreter) |
 |----------------------:|----------:|-----------------:|--------------------------:|
 |    evmone interpreter |      3943 |           67.98x |                     1.00x |
-|       evmone compiler |       740 |           12.73x |                     5.32x |
+|   **evmone compiler** |   **740** |       **12.73x** |                 **5.32x** |
 | Manual loop inversion |       236 |            4.07x |                    16.71x |
 |       Elide gas check |        59 |            1.03x |                    66.83x |
 |              Native C |        58 |            1.00x |                    67.98x |
 
 
-Our early results are quite encouraging: the current prototype can already achieve 5-10x speedup against the fastest EVM interpreter. We could implement loop inversions in our compiler automatically; or, we could improve our generated code and let LLVM's [`LoopRotation` pass](https://llvm.org/docs/LoopTerminology.html#rotated-loops) do the work for us. Finally, we believe it's even possible to remove the out-of-gas checks completely from the generated code and achieve C-level performance ultimately.
+Our early results are very encouraging: the current prototype can already achieve 5-10x speedup against the fastest EVM interpreter. The speedup will be even more significant (17-32x) if we perform loop inversions automatically. Or even better, we could improve our generated code and let LLVM's [`LoopRotation` pass](https://llvm.org/docs/LoopTerminology.html#rotated-loops) do the work for us. Finally, we believe it's possible to remove the out-of-gas checks completely from the generated code and achieve C-level performance (<50% slower) ultimately.
 
 
 ## Limitations
