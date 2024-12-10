@@ -3,7 +3,7 @@
 
 ## Approach
 
-At the high level, our compilation scheme is as follows. 
+At a high level, our compilation scheme is as follows. 
 ```
                         ┌───────────────┐
                         │               │
@@ -44,7 +44,7 @@ sudo apt update; sudo apt install cmake gcc-12 g++-12 -y
 yes | sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 ```
 
-Then you can following the [build instructions](https://github.com/ethereum/evmone#building-from-source) of evmone. Just remember to point the C/C++ compilers to `clang`:
+Then you can follow the [build instructions](https://github.com/ethereum/evmone#building-from-source) of evmone. Just remember to point the C/C++ compilers to `clang`:
 ```
 CC=clang-17 CXX=clang++-17 cmake -S . -B build -DEVMONE_TESTING=ON
 ```
