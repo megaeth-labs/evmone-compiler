@@ -77,7 +77,7 @@ The following two tables compares the performance of various versions of the pro
 - `evmone compiler`: our compiler prototype;
 - `Manual loop inversion`: apply a simple [loop inversion](https://en.wikipedia.org/wiki/Loop_inversion) optimization on the bytecode before passing it through our compiler;
 - `Elide gas check`: after loop inversion, remove the out-of-gas checks (but still keep gas metering) in the generated code;
-- `Native C`: a 256-bit arithemetic fibonacci program written in C++.
+- `Native C`: a 256-bit arithmetic fibonacci program written in C++.
 
 
 *CPU: AMD EPYC™ 7543*
